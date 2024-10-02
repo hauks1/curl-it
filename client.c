@@ -11,6 +11,8 @@
 #include <b64/cdecode.h>
 #include <curl/curl.h>
 #include <cjson/cJSON.h> 
+#include <time.h>
+#include <math.h>
 #include "relic/relic.h"
 
 
@@ -54,139 +56,138 @@ int relic_cleanup() {
     core_clean();
     return RLC_OK;
 }
-/**
- * @brief Prepares a JSON object with server request details.
- *
- * This function takes a JSON object, an array of messages, a base64-encoded signature,
- * and the length of the signature, and populates the JSON object with these details.
- *
- * @param server_obj A pointer to a cJSON object that will be populated with the request details.
- * @param messages An array of strings containing the messages to be added to the JSON object.
- * @param sig_b64 A string containing the base64-encoded signature.
- * @param sig_len An integer representing the length of the signature.
- * 
- * @return Returns 1 on success, 0 on failure.
- */
-int prepare_req_server(cJSON *server_obj,char **messages, char *sig_b64, int sig_len){
+
+int prepare_req_server_num(cJSON *server_obj,uint8_t *messages,int messages_len, char *sig_b64, int sig_len, char *data_set_id, char *id, char *tag,char *pk_b64){
     cJSON *messages_array = cJSON_CreateArray();
-    for (int i = 0; i < 4; i++) {
-        cJSON_AddItemToArray(messages_array, cJSON_CreateString(messages[i]));
+    if (messages_array == NULL) {
+        fprintf(stderr, "Failed to create JSON array\n");
+        return -1;
+    }
+    for (int i = 0; i < messages_len; i++) {
+        cJSON *message_item = cJSON_CreateNumber(messages[i]);
+        if (message_item == NULL) {
+            fprintf(stderr, "Failed to create JSON number\n");
+            cJSON_Delete(messages_array);
+            return -1;
+        }
+        cJSON_AddItemToArray(messages_array, message_item);
+    }
+
+    if (!cJSON_AddItemToObject(server_obj, "messages", messages_array)) {
+        fprintf(stderr, "Failed to add messages array to JSON object\n");
+        cJSON_Delete(messages_array);
+        return -1;
     }
     
-    if(!cJSON_AddItemToObject(server_obj, "messages", messages_array)){
-        return 0;
-    }
     if(!cJSON_AddStringToObject(server_obj, "signature",sig_b64)){
-        return 0;
+        fprintf(stderr, "Failed to add signature to JSON object\n");
+        return -1;
     }
     if(!cJSON_AddNumberToObject(server_obj, "signature_length",sig_len)){
-        return 0;
+        fprintf(stderr, "Failed to add signature length to JSON object\n");
+        return -1;
+    }
+    if(!cJSON_AddStringToObject(server_obj, "data_set_id",data_set_id)){
+        fprintf(stderr, "Failed to add data set id to JSON object\n");
+        return -1;
+    }
+    if(!cJSON_AddStringToObject(server_obj, "id",id)){
+        fprintf(stderr, "Failed to add id to JSON object\n");
+        return -1;
+    }
+    if(!cJSON_AddStringToObject(server_obj, "tag",tag)){
+        fprintf(stderr, "Failed to add tag to JSON object\n");
+        return -1;
+    }
+    if(!cJSON_AddStringToObject(server_obj, "public_key",pk_b64)){
+        fprintf(stderr, "Failed to add public key to JSON object\n");
+        return -1;
     }
     return 1;
 }
-/**
- * @brief Prepares a JSON object with verifier information.
- *
- * This function adds various fields to a given cJSON object, including
- * data set ID, ID, tag, signature, signature length, and a public key.
- * The public key is converted to a byte array, encoded in Base64, and
- * then added to the JSON object.
- *
- * @param verifier_obj The cJSON object to which the fields will be added.
- * @param data_set_id The data set ID to be added to the JSON object.
- * @param id The ID to be added to the JSON object.
- * @param tag The tag to be added to the JSON object.
- * @param sig_b64 The Base64 encoded signature to be added to the JSON object.
- * @param sig_len The length of the signature.
- * @param pk The public key to be converted, encoded, and added to the JSON object.
- * 
- * @return int Returns 1 on success, 0 on failure.
- */
-int prepare_req_verifier(cJSON *verifier_obj, char *data_set_id, char *id, char *tag, char *sig_b64, int sig_len, g2_t pk){
-
-    if(!cJSON_AddStringToObject(verifier_obj, "data_set_id",data_set_id)){
-        return 0;
+/* Function to generate some random data, REMEMEBR TO FREE THE MESSAGES and LEN */
+int gen_data(uint8_t *messages){
+    if(messages == NULL){
+        fprintf(stderr,"Could not allocate messages\n");
+        return -1;
     }
-    if(!cJSON_AddStringToObject(verifier_obj, "id",id)){
-        return 0;
+    srand(time(NULL)); // init 
+    for(int i = 0; i < 10; i++){
+        uint8_t random_num = rand();
+        messages[i] = random_num; // Does not matter if some or all of the numbers are the same
     }
-    if(!cJSON_AddStringToObject(verifier_obj, "tag",tag)){
-        return 0;
-    }
-    if(!cJSON_AddStringToObject(verifier_obj, "signature",sig_b64)){
-        return 0;
-    }
-    if(!cJSON_AddNumberToObject(verifier_obj, "signature_length",sig_len)){
-        return 0;
-    }
-    // Convert the public key to a byte array
-    int pk_len = g2_size_bin(pk,1);
-    unsigned char pk_buf[pk_len];
-    g2_write_bin(pk_buf, pk_len, pk, 1); // Write the public key to the byte array
-    // Encode the public key in Base64
-    char* pk_b64 = base64_encode((char*)pk_buf, pk_len);
-    if(!cJSON_AddStringToObject(verifier_obj, "public_key",pk_b64)){
-        return 0;
-    }
-
     return 1;
 }
-
-
+/* MAIN */
 int main(int argc, char *argv[]){
     // Initialize the RELIC library
     relic_init();
     bn_t sk;
     g2_t pk;
-    // Initialize variables to null state
     bn_null(sk);
     g2_null(pk);
-    // Allocate memory for variables
     bn_new(sk);
     g2_new(pk);
 
-    // Generate key pair
+    /* Generate key pair */
     int res = cp_mklhs_gen(sk,pk);
     assert(res == RLC_OK);
-
-    // Message array with some messages 
-    char *str_m1 = "69";
-    char *str_m2 = "42";
-    char *str_m3 = "12";
-    char *str_m4 = "45";
-    // Add the messages to the array
-    char *messages[4] = {str_m1,str_m2,str_m3,str_m4};
-    // Convert str_m to bn_t
+    printf("PUBLIC KEY:\n");
+    g2_print(pk);
+    /* Format and encode the public key  */ 
+    int pk_len = g2_size_bin(pk,1);
+    unsigned char pk_buf[pk_len];
+    g2_write_bin(pk_buf, pk_len, pk, 1); // Write the public key to the byte array  
+    char* pk_b64 = base64_encode((char*)pk_buf, pk_len);
+    
+    uint8_t *messages = (uint8_t *)malloc(sizeof(uint8_t));
+    int data_gen_res = gen_data(messages);
+    assert(data_gen_res == 1);
     bn_t m;
     bn_null(m);
     bn_new(m);
-    char temp[1024] = {0};
-    for (int i = 1; i < 2; i++) {
-        strcat(temp,messages[i]);
-    }
-    bn_read_str(m, temp, strlen(temp),10);
-    // Sign the message
+    bn_read_bin(m, messages, 10);
+  
+    printf("PRINT BN_T M:");
+    bn_print(m);
+
+    /* Sign the message */
     g1_t sig;
     g1_null(sig);
     g1_new(sig);
-    // Random dataset identifier, id and tag
+    // Random dataset id, id and tag
     const char *data_set_id = "123";
     const char *id = "456";
     const char *tag = "789";
-    // Sign the data
+
+    /* Sign the data */
     res = cp_mklhs_sig(sig,m,data_set_id,id,tag,sk);
     assert(res == RLC_OK);
-    // Convert the signature to a byte array
+    printf("SIGNATURE\n");
+    g1_print(sig);
+
+    /* Convert the signature and encode signature */
     int sig_len = g1_size_bin(sig,1);
     unsigned char sig_buf[sig_len];
     g1_write_bin(sig_buf, sig_len, sig, 1); // Write the signature to the byte array
-    // Encode the signature in Base64
-    char* sig_b64 = base64_encode((char*)sig_buf, sig_len);    
-    // Set up the CURL request
-    CURL *curl_server, *curl_verifier;
-    CURLcode res_server, res_verifier;
+    char* sig_b64 = base64_encode((char*)sig_buf, sig_len);   
+    // Decode the signature 
+    int decoded_sig_len;
+    unsigned char* decoded_sig = (unsigned char*)base64_decode(sig_b64, strlen(sig_b64), &decoded_sig_len);
+    if (decoded_sig == NULL) {
+        fprintf(stderr, "Failed to decode signature\n");
+        return -1;
+    }
+    g1_t sig_converted;
+    g1_null(sig_converted);
+    g1_new(sig_converted);
+    g1_read_bin(sig_converted, decoded_sig, decoded_sig_len);
+    printf("Converted Signature:\n");
+    g1_print(sig_converted);
+    
+    CURL *curl_server;
+    CURLcode res_server;
     curl_server = curl_easy_init();
-    curl_verifier = curl_easy_init();
 
     /* Commence curling to the server */ 
     if(curl_server) {
@@ -194,13 +195,15 @@ int main(int argc, char *argv[]){
         headers = curl_slist_append(headers, "Content-Type: application/json");
         // JSON setup and sending
         cJSON *json_obj = cJSON_CreateObject();
-        if(prepare_req_server(json_obj,messages,sig_b64,sig_len) == 0){
+      
+        if(!prepare_req_server_num(json_obj,messages,10,sig_b64,sig_len,(char *)data_set_id,(char *)id,(char *)tag,pk_b64)){
             fprintf(stderr, "Failed to prepare request\n");
-            return 0;
+            return -1;
         }
+        printf("%s\n",cJSON_Print(json_obj));
         char *json_str = cJSON_Print(json_obj);
         // Specify the URL
-        curl_easy_setopt(curl_server, CURLOPT_URL, "http://localhost:12345/signature-post");
+        curl_easy_setopt(curl_server, CURLOPT_URL, "http://localhost:12345/new");
         // Specify the data to be sent
         curl_easy_setopt(curl_server, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl_server, CURLOPT_POSTFIELDS, json_str);
@@ -214,11 +217,7 @@ int main(int argc, char *argv[]){
         cJSON_Delete(json_obj); 
         free(sig_b64);
     }
-    if(curl_verifier){
-        
-    }
-
-
+  
     // Clean up the RELIC library
     relic_cleanup();
     return 0;
