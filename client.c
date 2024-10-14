@@ -106,56 +106,60 @@ int prepare_req_server_num(cJSON *server_obj,uint8_t *messages,int messages_len,
     return 1;
 }
 /* Function to generate some random data, REMEMEBR TO FREE THE MESSAGES and LEN */
-int gen_data(uint8_t *messages){
+int gen_data(uint8_t *messages,int num_messages){
+    messages = (uint8_t *)malloc(sizeof(uint8_t)*num_messages);
     if(messages == NULL){
         fprintf(stderr,"Could not allocate messages\n");
         return -1;
     }
     srand(time(NULL)); // init 
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < num_messages; i++){
         uint8_t random_num = rand();
         messages[i] = random_num; // Does not matter if some or all of the numbers are the same
     }
-    return 1;
+    return 0;
 }
 /* MAIN */
 int main(int argc, char *argv[]){
-    // Initialize the RELIC library
+    /* Initialize the RELIC library */ 
     relic_init();
-    bn_t sk;
+    /* Initialize the needed variables */
     g2_t pk;
-    bn_null(sk);
     g2_null(pk);
-    bn_new(sk);
     g2_new(pk);
+
+    g1_t sig;
+    g1_null(sig);
+    g1_new(sig);
+    
+    bn_t sk,m;
+    bn_null(sk);
+    bn_new(sk);
+    bn_null(m);
+    bn_new(m);
 
     /* Generate key pair */
     int res = cp_mklhs_gen(sk,pk);
     assert(res == RLC_OK);
     printf("PUBLIC KEY:\n");
     g2_print(pk);
+
     /* Format and encode the public key  */ 
     int pk_len = g2_size_bin(pk,1);
     unsigned char pk_buf[pk_len];
     g2_write_bin(pk_buf, pk_len, pk, 1); // Write the public key to the byte array  
     char* pk_b64 = base64_encode((char*)pk_buf, pk_len);
     
-    uint8_t *messages = (uint8_t *)malloc(sizeof(uint8_t));
-    int data_gen_res = gen_data(messages);
-    assert(data_gen_res == 1);
-    bn_t m;
-    bn_null(m);
-    bn_new(m);
+    /* Generate and format message*/
+    int num_messages = 10;
+    uint8_t messages[num_messages]; 
+    int data_gen_res = gen_data(messages,num_messages);
+    assert(data_gen_res == 0);
     bn_read_bin(m, messages, 10);
-  
     printf("PRINT BN_T M:");
     bn_print(m);
 
-    /* Sign the message */
-    g1_t sig;
-    g1_null(sig);
-    g1_new(sig);
-    // Random dataset id, id and tag
+    /* Random dataset id, id and tag */
     const char *data_set_id = "123";
     const char *id = "456";
     const char *tag = "789";
@@ -170,8 +174,9 @@ int main(int argc, char *argv[]){
     int sig_len = g1_size_bin(sig,1);
     unsigned char sig_buf[sig_len];
     g1_write_bin(sig_buf, sig_len, sig, 1); // Write the signature to the byte array
-    char* sig_b64 = base64_encode((char*)sig_buf, sig_len);   
-    // Decode the signature 
+    char* sig_b64 = base64_encode((char*)sig_buf, sig_len);
+
+    /* The code before the curling is test code*/
     int decoded_sig_len;
     unsigned char* decoded_sig = (unsigned char*)base64_decode(sig_b64, strlen(sig_b64), &decoded_sig_len);
     if (decoded_sig == NULL) {
@@ -216,6 +221,7 @@ int main(int argc, char *argv[]){
         cJSON_free(json_str); 
         cJSON_Delete(json_obj); 
         free(sig_b64);
+        
     }
   
     // Clean up the RELIC library
