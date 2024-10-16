@@ -2,123 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <openssl/sha.h>
-#include <openssl/hmac.h>
-#include <openssl/evp.h>
-#include <openssl/bio.h>
-#include <openssl/buffer.h>
-#include <b64/cencode.h>
-#include <b64/cdecode.h>
 #include <curl/curl.h>
 #include <cjson/cJSON.h> 
-#include <time.h>
-#include <math.h>
+#include <uuid/uuid.h>
 #include "relic/relic.h"
+#include "utils/crypto.h"
+#include "utils/parsing.h"
 
-
-char* base64_encode(const char* input, int length) {
-    base64_encodestate state;
-    base64_init_encodestate(&state);
-
-    int encoded_length = 4 * ((length + 2) / 3); // Base64 encoded length
-    char* encoded = (char*)malloc(encoded_length + 1); // +1 for null terminator
-    int len = base64_encode_block(input, length, encoded, &state);
-    len += base64_encode_blockend(encoded + len, &state);
-    encoded[len] = '\0'; // Null-terminate the encoded string
-
-    return encoded;
-}
-
-char* base64_decode(const char* input, int length, int* decoded_length) {
-    base64_decodestate state;
-    base64_init_decodestate(&state);
-
-    char* decoded = (char*)malloc(length * 3 / 4 + 1); // Allocate enough space for decoded data
-    *decoded_length = base64_decode_block(input, length, decoded, &state);
-    decoded[*decoded_length] = '\0'; // Null-terminate the decoded string
-
-    return decoded;
-}
-
-int relic_init() {
-    if (core_init() == RLC_ERR) {
-        core_clean();
-        return RLC_ERR;
-    }
-    if (pc_param_set_any() != RLC_OK) {
-        core_clean();
-        return RLC_ERR;
-    }
-    return RLC_OK;
-}
-
-int relic_cleanup() {
-    core_clean();
-    return RLC_OK;
-}
-
-int prepare_req_server_num(cJSON *server_obj,uint8_t *messages,int messages_len, char *sig_b64, int sig_len, char *data_set_id, char *id, char *tag,char *pk_b64){
-    cJSON *messages_array = cJSON_CreateArray();
-    if (messages_array == NULL) {
-        fprintf(stderr, "Failed to create JSON array\n");
-        return -1;
-    }
-    for (int i = 0; i < messages_len; i++) {
-        cJSON *message_item = cJSON_CreateNumber(messages[i]);
-        if (message_item == NULL) {
-            fprintf(stderr, "Failed to create JSON number\n");
-            cJSON_Delete(messages_array);
-            return -1;
-        }
-        cJSON_AddItemToArray(messages_array, message_item);
-    }
-
-    if (!cJSON_AddItemToObject(server_obj, "messages", messages_array)) {
-        fprintf(stderr, "Failed to add messages array to JSON object\n");
-        cJSON_Delete(messages_array);
-        return -1;
-    }
-    
-    if(!cJSON_AddStringToObject(server_obj, "signature",sig_b64)){
-        fprintf(stderr, "Failed to add signature to JSON object\n");
-        return -1;
-    }
-    if(!cJSON_AddNumberToObject(server_obj, "signature_length",sig_len)){
-        fprintf(stderr, "Failed to add signature length to JSON object\n");
-        return -1;
-    }
-    if(!cJSON_AddStringToObject(server_obj, "data_set_id",data_set_id)){
-        fprintf(stderr, "Failed to add data set id to JSON object\n");
-        return -1;
-    }
-    if(!cJSON_AddStringToObject(server_obj, "id",id)){
-        fprintf(stderr, "Failed to add id to JSON object\n");
-        return -1;
-    }
-    if(!cJSON_AddStringToObject(server_obj, "tag",tag)){
-        fprintf(stderr, "Failed to add tag to JSON object\n");
-        return -1;
-    }
-    if(!cJSON_AddStringToObject(server_obj, "public_key",pk_b64)){
-        fprintf(stderr, "Failed to add public key to JSON object\n");
-        return -1;
-    }
-    return 1;
-}
-/* Function to generate some random data, REMEMEBR TO FREE THE MESSAGES and LEN */
-int gen_data(uint8_t *messages,int num_messages){
-    messages = (uint8_t *)malloc(sizeof(uint8_t)*num_messages);
-    if(messages == NULL){
-        fprintf(stderr,"Could not allocate messages\n");
-        return -1;
-    }
-    srand(time(NULL)); // init 
-    for(int i = 0; i < num_messages; i++){
-        uint8_t random_num = rand();
-        messages[i] = random_num; // Does not matter if some or all of the numbers are the same
-    }
-    return 0;
-}
 /* MAIN */
 int main(int argc, char *argv[]){
     /* Initialize the RELIC library */ 
@@ -133,6 +23,7 @@ int main(int argc, char *argv[]){
     g1_new(sig);
     
     bn_t sk,m;
+    bn_t test_m;
     bn_null(sk);
     bn_new(sk);
     bn_null(m);
@@ -152,17 +43,32 @@ int main(int argc, char *argv[]){
     
     /* Generate and format message*/
     int num_messages = 10;
-    uint8_t messages[num_messages]; 
+    uint8_t messages[num_messages];
     int data_gen_res = gen_data(messages,num_messages);
     assert(data_gen_res == 0);
-    bn_read_bin(m, messages, 10);
+    bn_read_bin(m, messages, num_messages);
+    
     printf("PRINT BN_T M:");
     bn_print(m);
+  
+    // Generate uuid 
+    uuid_t uuid,ds_id,date; 
+    uuid_generate(uuid);
+    uuid_generate(ds_id);
+    uuid_generate_time(date);
 
+    char uuid_str[37], ds_id_str[37], date_str[37];
+    uuid_unparse(uuid, uuid_str);
+    uuid_unparse(ds_id, ds_id_str);
+    uuid_unparse(date, date_str);
+
+    printf("UUID: %s\n", uuid_str);
+    printf("Dataset ID: %s\n", ds_id_str);
+    printf("Date: %s\n", date_str);
     /* Random dataset id, id and tag */
-    const char *data_set_id = "123";
-    const char *id = "456";
-    const char *tag = "789";
+    const char *data_set_id = uuid_str;
+    const char *id = ds_id_str;
+    const char *tag = date_str;
 
     /* Sign the data */
     res = cp_mklhs_sig(sig,m,data_set_id,id,tag,sk);
