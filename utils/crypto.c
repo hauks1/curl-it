@@ -2,6 +2,7 @@
 #include "relic/relic.h"
 #include <b64/cencode.h>
 #include <b64/cdecode.h>
+#include "parsing.h"
 /**
  * @file crypto_utils.c
  * @brief Utility functions for cryptographic operations and wrappers for different relic based operations.
@@ -97,4 +98,54 @@ char* base64_encode(const char* input, int length) {
 
     return encoded;
 }
+int gen_keys(bn_t sk, g2_t pk){
+    
+    bn_null(sk);
+    bn_new(sk);
+    g2_null(pk);
+    g2_new(pk);
 
+    int res = cp_mklhs_gen(sk,pk);
+    if(res != RLC_OK){
+        return -1;
+    }
+    return 0;
+}
+
+int sign_data_points(message_t *message,bn_t sk, size_t num_data_points){
+    /* Sign all the datapoints */
+    for (int i = 0; i < num_data_points; i++) {
+        int res_sign = cp_mklhs_sig(message->sigs[i], message->data_point[i], message->data_set_id, message->ids[0], message->tags[i], sk);
+        if (res_sign != RLC_OK) {
+            fprintf(stderr, "Could not sign message\n");
+            return -1;
+        }
+    }
+    return 0;
+
+}
+int encode_signatures(message_t *msg, unsigned char *master[], char *master_decoded[], int num_data_points){
+    int sig_len = g1_size_bin(msg->sigs[0], 1);
+    /* Convert the signature and encode signature */
+    for (size_t i = 0; i < num_data_points; i++) {
+        printf("Signature length: %d\n", sig_len);
+
+        // Allocate memory for the signature buffer
+        master[i] = (unsigned char*)malloc(sig_len * sizeof(unsigned char));
+        if (master[i] == NULL) {
+            fprintf(stderr, "Memory allocation failed for master_sig_buf[%zu]\n", i);
+            return -1;
+        }
+
+        g1_write_bin(master[i], sig_len, msg->sigs[i], 1); // Write the signature to the byte array
+        printf("Signature %zu:\n", i);
+        g1_print(msg->sigs[i]);
+        // Encode the signature
+        master_decoded[i] = base64_encode((char *)master[i], sig_len);
+        if (master_decoded[i] == NULL) {
+            fprintf(stderr, "Failed to encode signature %zu\n", i);
+            return -1;
+        }
+    }
+    return 0;
+}
