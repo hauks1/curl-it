@@ -26,18 +26,20 @@ int init_message(message_t *message, dig_t data_points[], size_t num_data_points
         g1_null(message->sigs[i]);
         g1_new(message->sigs[i]);
 
-        // Create random UUIDs
-        uuid_t uuid, date;
-        uuid_generate(uuid);
+        // Create random tag's
+        uuid_t  date;
         uuid_generate_time(date);
         char uuid_str[37], date_str[37];
-        uuid_unparse(uuid, uuid_str);
         uuid_unparse(date, date_str);
 
-        strncpy(message->ids[i], uuid_str, sizeof(message->ids[i]));
+        
         strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
     }
-
+    uuid_t uuid;
+    uuid_generate(uuid);
+    char uuid_str[37];
+    uuid_unparse(uuid, uuid_str);
+    strncpy(message->ids[0], uuid_str, sizeof(message->data_set_id));
     // Set data_set_id
     strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
 
@@ -66,7 +68,6 @@ void curl_to_server(const char *url,cJSON *json){
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
      
-        printf("%s\n",cJSON_Print(json));
         char *json_str = cJSON_Print(json);
         // Specify the URL
         curl_easy_setopt(curl_server, CURLOPT_URL, url);
@@ -99,11 +100,7 @@ int main(int argc, char *argv[]){
         fprintf(stderr,"Failed to generate keys\n");
         return -1;
     }
-    printf("PUBLIC KEY:\n");
-    g2_print(pk);
-    printf("SECRET KEY:\n");
-    bn_print(sk);
-
+ 
     /* Format and encode the public key  */ 
     int pk_len = g2_size_bin(pk,1);
     unsigned char pk_buf[pk_len];
@@ -116,14 +113,13 @@ int main(int argc, char *argv[]){
         fprintf(stderr,"Could not allocate message\n");
         return -1;
     }
-    dig_t data_points[7] = {2,2,2,2,2,2,2};
+    dig_t data_points[7] = {1,1,1,1,1};
     size_t num_data_points = NUM_DATA_POINTS;
     int init_res = init_message(message, data_points, num_data_points);
     if (init_res != 0) {
         fprintf(stderr, "Failed to initialize message\n");
         return -1;
     }
-    print_message(message);
     while(1){
 
         int sign_res = sign_data_points(message,sk,NUM_DATA_POINTS);
@@ -149,9 +145,10 @@ int main(int argc, char *argv[]){
             fprintf(stderr,"Failed to prepare request\n");
             return -1;
         }
+        printf("%s\n",cJSON_Print(json_obj));
         curl_to_server("http://localhost:12345/new",json_obj);
         cJSON_Delete(json_obj); 
-        sleep(5);
+        sleep(60);
     }
 
     

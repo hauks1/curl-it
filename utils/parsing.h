@@ -4,7 +4,7 @@
 #include <relic/relic.h>
 
 #define TEST_DATABASE "test.db"
-#define NUM_DATA_POINTS 7
+#define NUM_DATA_POINTS 5
 #define NUM_MESSAGES 1
 
 int prepare_req_server_num(cJSON *server_obj,uint8_t *messages,int messages_len, char *sig_b64, int sig_len, char *data_set_id, char *id, char *tag,char *pk_b64);

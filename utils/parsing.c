@@ -17,7 +17,6 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
     // JSON setup and sending
     cJSON *signatures = cJSON_CreateArray();
     cJSON *messages = cJSON_CreateArray();
-    cJSON *ids = cJSON_CreateArray();
     cJSON *tags = cJSON_CreateArray();
     cJSON *data_set_id = cJSON_CreateString(TEST_DATABASE);
     cJSON *public_key = cJSON_CreateString(pk_b64);
@@ -26,12 +25,12 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
         cJSON_AddItemToArray(signatures, sig);
         cJSON *msg = cJSON_CreateNumber(data_points[i]);
         cJSON_AddItemToArray(messages, msg);
-        cJSON *id = cJSON_CreateString(message->ids[0]);
-        cJSON_AddItemToArray(ids, id);
         cJSON *tag = cJSON_CreateString(message->tags[i]);
         cJSON_AddItemToArray(tags, tag);
     }
-    cJSON_AddItemToObject(json_obj, "messages", messages);
+    cJSON *id = cJSON_CreateString(message->ids[0]);
+    cJSON_AddItemToObject(json_obj, "id",id);
+    cJSON_AddItemToObject(json_obj, "datapoints", messages);
     if (messages == NULL) {
         fprintf(stderr, "Failed to create JSON array for messages\n");
         cJSON_Delete(json_obj);
@@ -44,8 +43,7 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
         return -1;
     }
     cJSON_AddNumberToObject(json_obj, "signature_length", sig_len);
-    cJSON_AddItemToObject(json_obj, "ids", ids);
-    if (ids == NULL) {
+    if (id == NULL) {
         fprintf(stderr, "Failed to create JSON array for ids\n");
         cJSON_Delete(json_obj);
         return -1;

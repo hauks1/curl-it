@@ -128,7 +128,6 @@ int encode_signatures(message_t *msg, unsigned char *master[], char *master_deco
     int sig_len = g1_size_bin(msg->sigs[0], 1);
     /* Convert the signature and encode signature */
     for (size_t i = 0; i < num_data_points; i++) {
-        printf("Signature length: %d\n", sig_len);
 
         // Allocate memory for the signature buffer
         master[i] = (unsigned char*)malloc(sig_len * sizeof(unsigned char));
@@ -138,8 +137,6 @@ int encode_signatures(message_t *msg, unsigned char *master[], char *master_deco
         }
 
         g1_write_bin(master[i], sig_len, msg->sigs[i], 1); // Write the signature to the byte array
-        printf("Signature %zu:\n", i);
-        g1_print(msg->sigs[i]);
         // Encode the signature
         master_decoded[i] = base64_encode((char *)master[i], sig_len);
         if (master_decoded[i] == NULL) {
