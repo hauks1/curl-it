@@ -115,7 +115,7 @@ int gen_keys(bn_t sk, g2_t pk){
 int sign_data_points(message_t *message,bn_t sk, size_t num_data_points){
     /* Sign all the datapoints */
     for (int i = 0; i < num_data_points; i++) {
-        int res_sign = cp_mklhs_sig(message->sigs[i], message->data_point[i], message->data_set_id, message->ids[0], message->tags[i], sk);
+        int res_sign = cp_mklhs_sig(message->sigs[i], message->data_points[i], message->data_set_id, message->ids[0], message->tags[i], sk);
         if (res_sign != RLC_OK) {
             fprintf(stderr, "Could not sign message\n");
             return -1;
