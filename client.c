@@ -152,14 +152,8 @@ int main(int argc, char *argv[]){
         for(size_t i = 0; i < NUM_DATA_POINTS; i++){
             printf("Data point %zu: %f\n",i,float_data_points[i]);
         }
-        printf("Scaling the data points by %ld\n",scale);
         for(size_t i = 0; i < NUM_DATA_POINTS; i++){
             data_points[i] = (dig_t)(float_data_points[i] * scale);
-        }
-        // Print all the digs
-
-        for(size_t i = 0; i < NUM_DATA_POINTS; i++){
-            printf("Data point %zu: %ld\n",i,data_points[i]);
         }
     }else{
         printf("Generating dig data points...\n");
@@ -169,19 +163,18 @@ int main(int argc, char *argv[]){
             return -1;
         }
     }
+    /* Initialize the message */
     int init_res = init_message(message, data_points,NUM_DATA_POINTS);
     if (init_res != 0) {
         fprintf(stderr, "Failed to initialize message\n");
         return -1;
     }
     while(1){
-
         int sign_res = sign_data_points(message,sk,NUM_DATA_POINTS);
         if(sign_res != 0){
             fprintf(stderr,"Failed to sign data points\n");
             return -1;
         }
-        
         // Array that holds all the signatures
         unsigned char *master_sig_buf[NUM_DATA_POINTS];
         char *master_decoded_sig_buf[NUM_DATA_POINTS];
