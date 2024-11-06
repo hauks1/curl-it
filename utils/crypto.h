@@ -2,7 +2,7 @@
 #define CRYPTO_H
 
 #include <relic/relic.h> // Include the Relic library header
-#include "parsing.h"
+#include "request.h"
 /* The headerfile for the crypto_utils*/
 int relic_init();
 int relic_cleanup();

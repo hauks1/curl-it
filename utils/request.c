@@ -11,9 +11,9 @@
 #include <cjson/cJSON.h> 
 #include <time.h>
 #include <math.h>
-#include "parsing.h"
+#include "request.h"
 
-int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *master_decoded_sig_buf[],dig_t data_points[], size_t num_data_points, char *pk_b64,int sig_len,u_int64_t scale){
+int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *master_decoded_sig_buf[],dig_t data_points[], size_t num_data_points, char *pk_b64,int sig_len,u_int64_t scale,char *func){
     // JSON setup and sending
     cJSON *signatures = cJSON_CreateArray();
     cJSON *messages = cJSON_CreateArray();
@@ -21,6 +21,8 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
     cJSON *data_set_id = cJSON_CreateString(TEST_DATABASE);
     cJSON *public_key = cJSON_CreateString(pk_b64);
     cJSON *scale_json = cJSON_CreateNumber(scale);
+    cJSON *func_json = cJSON_CreateString(func);
+
     for(size_t i=0; i < num_data_points; i++){
         cJSON *sig = cJSON_CreateString(master_decoded_sig_buf[i]);
         cJSON_AddItemToArray(signatures, sig);
@@ -73,19 +75,52 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
         cJSON_Delete(json_obj);
         return -1;
     }
-    return 0;
-}
-/* Function to generate some random data, REMEMEBR TO FREE THE MESSAGES and LEN */
-int gen_data(uint8_t *messages,int num_messages){
-    messages = (uint8_t *)malloc(sizeof(uint8_t)*num_messages);
-    if(messages == NULL){
-        fprintf(stderr,"Could not allocate messages\n");
+    cJSON_AddItemToObject(json_obj, "function", func_json);
+    if (func_json == NULL) {
+        fprintf(stderr, "Failed to create JSON string for function\n");
+        cJSON_Delete(json_obj);
         return -1;
     }
-    srand(time(NULL)); // init 
-    for(int i = 0; i < num_messages; i++){
-        uint8_t random_num = rand();
-        messages[i] = random_num; // Does not matter if some or all of the numbers are the same
+    return 0;
+}
+int gen_dig_data_points(dig_t data_points[], size_t num_data_points){
+    srand(time(NULL)); 
+    int range = 2000;
+    int min = 1000;
+    for(int i = 0; i < num_data_points; i++){
+        data_points[i] = (dig_t)(rand() % range + min);
     }
     return 0;
+}
+int gen_float_data_points(double data_points[], size_t num_data_points){
+    srand(time(NULL)); 
+    float a = 2.0;
+    for(int i = 0; i < num_data_points; i++){
+        data_points[i] = ((float)rand()/(float)(RAND_MAX)) * a;
+    }
+    return 0;
+}
+void curl_to_server(const char *url,cJSON *json){
+    CURL *curl_server;
+    CURLcode res_server;
+
+    curl_server = curl_easy_init();
+    if(curl_server) {
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+     
+        char *json_str = cJSON_Print(json);
+        // Specify the URL
+        curl_easy_setopt(curl_server, CURLOPT_URL, url);
+        // Specify the data to be sent
+        curl_easy_setopt(curl_server, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl_server, CURLOPT_POSTFIELDS, json_str);
+        // Perform the request
+        res_server = curl_easy_perform(curl_server);
+        if(res_server != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
+        }
+        curl_easy_cleanup(curl_server);
+        cJSON_free(json_str); 
+    }
 }

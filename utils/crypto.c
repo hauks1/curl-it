@@ -2,7 +2,7 @@
 #include "relic/relic.h"
 #include <b64/cencode.h>
 #include <b64/cdecode.h>
-#include "parsing.h"
+#include "request.h"
 /**
  * @file crypto_utils.c
  * @brief Utility functions for cryptographic operations and wrappers for different relic based operations.
