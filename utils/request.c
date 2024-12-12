@@ -85,8 +85,8 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
 }
 int gen_dig_data_points(dig_t data_points[], size_t num_data_points){
     srand(time(NULL)); 
-    int range = 2000;
-    int min = 1000;
+    int range = 40;
+    int min = 0;
     for(int i = 0; i < num_data_points; i++){
         data_points[i] = (dig_t)(rand() % range + min);
     }
@@ -94,9 +94,10 @@ int gen_dig_data_points(dig_t data_points[], size_t num_data_points){
 }
 int gen_float_data_points(double data_points[], size_t num_data_points){
     srand(time(NULL)); 
-    float a = 2.0;
+    float a = 35.0;
+    // Generate random float data points from 0 to 35 
     for(int i = 0; i < num_data_points; i++){
-        data_points[i] = ((float)rand()/(float)(RAND_MAX)) * a;
+        data_points[i] = ((double)rand() / (double)RAND_MAX) * a;
     }
     return 0;
 }
