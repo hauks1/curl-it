@@ -101,7 +101,7 @@ int gen_float_data_points(double data_points[], size_t num_data_points){
     }
     return 0;
 }
-void curl_to_server(const char *url,cJSON *json){
+int curl_to_server(const char *url,cJSON *json){
     CURL *curl_server;
     CURLcode res_server;
 
@@ -120,8 +120,11 @@ void curl_to_server(const char *url,cJSON *json){
         res_server = curl_easy_perform(curl_server);
         if(res_server != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
+            return -1;
         }
         curl_easy_cleanup(curl_server);
         cJSON_free(json_str); 
+        return 0;
     }
+    return -1;
 }

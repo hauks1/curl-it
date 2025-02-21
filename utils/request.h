@@ -4,7 +4,8 @@
 #include <relic/relic.h>
 
 #define TEST_DATABASE "test.db"
-#define NUM_DATA_POINTS 5
+#define DEVICE_ID "device_id"
+#define NUM_DATA_POINTS 30
 #define NUM_MESSAGES 1
 #define FUNC "doubling"
 
@@ -23,7 +24,7 @@ int gen_dig_data_points(dig_t data_points[], size_t num_data_points);
 /* Function to generate datapoints as floats */
 int gen_float_data_points(double data_points[], size_t num_data_points);
 /* Function that curls the server */
-void curl_to_server(const char *url,cJSON *json);
+int curl_to_server(const char *url,cJSON *json);
 
 
 

@@ -1,6 +1,7 @@
 #include "relic/relic.h"
 #include "utils/crypto.h"
 #include "utils/request.h"
+#include "utils/testing.h"
 #include <assert.h>
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
@@ -17,7 +18,7 @@ int init_message(message_t *message, dig_t data_points[],
     return -1;
   }
   for (int i = 0; i < num_data_points; i++) {
-    bn_null(message->data_point[i]);
+    bn_null(message->data_points[i]);
     bn_new(message->data_points[i]);
     bn_set_dig(message->data_points[i], data_points[i]);
 
@@ -37,7 +38,7 @@ int init_message(message_t *message, dig_t data_points[],
   uuid_generate(uuid);
   char uuid_str[37];
   uuid_unparse(uuid, uuid_str);
-  strncpy(message->ids[0], uuid_str, sizeof(message->data_set_id));
+  strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
   // Set data_set_id
   strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
 
@@ -55,86 +56,122 @@ void print_message(message_t *msg) {
   }
   printf("Data set id: %s\n", msg->data_set_id);
 }
-
+void cleanup_message(message_t *message, size_t num_data_points) {
+  if (message == NULL) return;
+  
+  for (size_t i = 0; i < num_data_points; i++) {
+      bn_free(message->data_points[i]);
+      g1_free(message->sigs[i]);
+  }
+}
 /* MAIN */
 int main(int argc, char *argv[]) {
   /* Initialize the RELIC library */
+  latency_metrics_t latency_metrics_end_to_end;
   relic_init();
-
+  
   /* Generate the secret and public key */
   g2_t pk;
   bn_t sk;
-
+  
   /* Generate key pair */
   int res = gen_keys(sk, pk);
   if (res != 0) {
     fprintf(stderr, "Failed to generate keys\n");
     return -1;
   }
-
   /* Format and encode the public key  */
   int pk_len = g2_size_bin(pk, 1);
   unsigned char pk_buf[pk_len];
   g2_write_bin(pk_buf, pk_len, pk, 1); // Write the public key to the byte array
   char *pk_b64 = base64_encode((char *)pk_buf, pk_len);
+  
+  int iterations = 0;
+  while (iterations < MAX_ITERATIONS) {
+    uint64_t scale = 1;
+    /* Allocate the data points */
+    dig_t *data_points = (dig_t *)malloc(sizeof(dig_t) * NUM_DATA_POINTS);
+    if (data_points == NULL) {
+      fprintf(stderr, "Could not allocate data points\n");
+      return -1;
+    }
+    clock_t start_end_to_end, end_end_to_end;
+    start_end_to_end = clock();
+    if (argc > 1 && strcmp(argv[1], "float") == 0) {
+      scale = 1000000;
+      printf("Generating float data points...\n");
+      double *float_data_points =
+      (double *)malloc(sizeof(double) * NUM_DATA_POINTS);
+      if (float_data_points == NULL) {
+        fprintf(stderr, "Could not allocate float data points\n");
+        return -1;
+      }
+      int gen_float_res =
+      gen_float_data_points(float_data_points, NUM_DATA_POINTS);
+      if (gen_float_res != 0) {
+        fprintf(stderr, "Failed to generate float data points\n");
+        return -1;
+      }
+      for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
+        printf("Data point %zu: %f\n", i, float_data_points[i]);
+      }
+      for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
+        data_points[i] = (dig_t)(float_data_points[i] * scale);
+      }
+    } else {
+      printf("Generating dig data points...\n");
+      int gen_res = gen_dig_data_points(data_points, NUM_DATA_POINTS);
+      if (gen_res != 0) {
+        fprintf(stderr, "Failed to generate data points\n");
+        return -1;
+      }
+    }
+    /* Allocate ONE message from random datapoints */
+    message_t *message = (message_t *)malloc(sizeof(message_t));
+    if (message == NULL) {
+      fprintf(stderr, "Could not allocate message\n");
+      return -1;
+    }
+    /* Initialize the message */
+    int init_res = init_message(message, data_points, NUM_DATA_POINTS);
+    if (init_res != 0) {
+      fprintf(stderr, "Failed to initialize message\n");
+      return -1;
+    }
+    /* Run troughput metrics og sign*/
+    latency_metrics_t latency_metrics;
+    
+    metrics_t signing_metrics,encoding_metrics,preparing_metrics;
+    test_config_t test_config = {
+        .num_data_points = NUM_DATA_POINTS,
+        .num_messages = MAX_ITERATIONS,
+        .scale = scale,
+      };
 
-  /* Allocate ONE message from random datapoints */
-  message_t *message = (message_t *)malloc(sizeof(message_t));
-  if (message == NULL) {
-    fprintf(stderr, "Could not allocate message\n");
-    return -1;
-  }
-  /* Allocate the data points */
-  dig_t *data_points = (dig_t *)malloc(sizeof(dig_t) * NUM_DATA_POINTS);
-  if (data_points == NULL) {
-    fprintf(stderr, "Could not allocate data points\n");
-    return -1;
-  }
-  uint64_t scale = 1;
-  if (argc > 1 && strcmp(argv[1], "float") == 0) {
-    scale = 1000000;
-    printf("Generating float data points...\n");
-    double *float_data_points =
-        (double *)malloc(sizeof(double) * NUM_DATA_POINTS);
-    if (float_data_points == NULL) {
-      fprintf(stderr, "Could not allocate float data points\n");
-      return -1;
-    }
-    int gen_float_res =
-        gen_float_data_points(float_data_points, NUM_DATA_POINTS);
-    if (gen_float_res != 0) {
-      fprintf(stderr, "Failed to generate float data points\n");
-      return -1;
-    }
-    for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
-      printf("Data point %zu: %f\n", i, float_data_points[i]);
-    }
-    for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
-      data_points[i] = (dig_t)(float_data_points[i] * scale);
-    }
-  } else {
-    printf("Generating dig data points...\n");
-    int gen_res = gen_dig_data_points(data_points, NUM_DATA_POINTS);
-    if (gen_res != 0) {
-      fprintf(stderr, "Failed to generate data points\n");
-      return -1;
-    }
-  }
-  /* Initialize the message */
-  int init_res = init_message(message, data_points, NUM_DATA_POINTS);
-  if (init_res != 0) {
-    fprintf(stderr, "Failed to initialize message\n");
-    return -1;
-  }
-  while (1) {
+    clock_t start_sig, end_sig;
+    size_t start_memory, end_memory;
+    
+    start_sig = clock();
     int sign_res = sign_data_points(message, sk, NUM_DATA_POINTS);
     if (sign_res != 0) {
       fprintf(stderr, "Failed to sign data points\n");
       return -1;
     }
+    end_sig = clock();
+    signing_metrics = get_metrics(start_sig, end_sig, sizeof(message_t),"signing",test_config);
+
+    int log_signing = log_metrics_to_csv(&test_config, &signing_metrics);
+    if(log_signing != 0){
+      fprintf(stderr, "Failed to log metrics to csv\n");
+      return -1;
+    }
+    
     // Array that holds all the signatures
     unsigned char *master_sig_buf[NUM_DATA_POINTS];
     char *master_decoded_sig_buf[NUM_DATA_POINTS];
+
+    clock_t start_encode, end_encode;
+    start_encode = clock();
 
     int sig_len = g1_size_bin(message->sigs[0], 1);
     int encode_res = encode_signatures(message, master_sig_buf,
@@ -143,6 +180,15 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Failed to encode signatures\n");
       return -1;
     }
+    end_encode = clock();
+    encoding_metrics = get_metrics(start_encode, end_encode, sizeof(message_t),"encoding",test_config);
+    int log_encode = log_metrics_to_csv(&test_config, &encoding_metrics);
+    if(log_encode != 0){
+      fprintf(stderr, "Failed to log metrics to csv\n");
+      return -1;
+    }
+    clock_t start_prepare, end_prepare;
+    start_prepare = clock();
     /* Commence curling to the server */
     cJSON *json_obj = cJSON_CreateObject();
     int prepare = prepare_request_server(
@@ -152,12 +198,30 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Failed to prepare request\n");
       return -1;
     }
+    end_prepare = clock();
+    preparing_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t),"preparing",test_config);
+    int log_prepare = log_metrics_to_csv(&test_config, &preparing_metrics);
+    
     printf("%s\n", cJSON_Print(json_obj));
-    curl_to_server("http://localhost:12345/new", json_obj);
+    int curl_res = curl_to_server("http://localhost:12345/new", json_obj);
+    if(curl_res != 0){
+      fprintf(stderr, "Failed to curl to server\n");
+      return -1;
+    }
+    end_end_to_end = clock();
+    printf("-------End to end latency metrics-------\n");
+    printf("End to end latency: %f\n", calculate_latency(end_end_to_end - start_end_to_end, 1));
     cJSON_Delete(json_obj);
-    sleep(60);
+    cleanup_message(message, NUM_DATA_POINTS);
+    free(data_points);
+    free(message);
+    printf("Iterations: %d\n", iterations);
+    iterations++;
+    sleep(2);
   }
-
+  free(pk_b64);
+  g2_free(pk);
+  bn_free(sk);
   // Clean up the RELIC library
   relic_cleanup();
   return 0;
