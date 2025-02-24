@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
   char *pk_b64 = base64_encode((char *)pk_buf, pk_len);
   
   int iterations = 0;
-  while (iterations < MAX_ITERATIONS) {
+  while (iterations < 1000) {
     uint64_t scale = 1;
     /* Allocate the data points */
     dig_t *data_points = (dig_t *)malloc(sizeof(dig_t) * NUM_DATA_POINTS);
@@ -111,12 +111,6 @@ int main(int argc, char *argv[]) {
       if (gen_float_res != 0) {
         fprintf(stderr, "Failed to generate float data points\n");
         return -1;
-      }
-      for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
-        printf("Data point %zu: %f\n", i, float_data_points[i]);
-      }
-      for (size_t i = 0; i < NUM_DATA_POINTS; i++) {
-        data_points[i] = (dig_t)(float_data_points[i] * scale);
       }
     } else {
       printf("Generating dig data points...\n");
@@ -202,7 +196,6 @@ int main(int argc, char *argv[]) {
     preparing_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t),"preparing",test_config);
     int log_prepare = log_metrics_to_csv(&test_config, &preparing_metrics);
     
-    printf("%s\n", cJSON_Print(json_obj));
     int curl_res = curl_to_server("http://localhost:12345/new", json_obj);
     if(curl_res != 0){
       fprintf(stderr, "Failed to curl to server\n");
@@ -215,9 +208,7 @@ int main(int argc, char *argv[]) {
     cleanup_message(message, NUM_DATA_POINTS);
     free(data_points);
     free(message);
-    printf("Iterations: %d\n", iterations);
     iterations++;
-    sleep(2);
   }
   free(pk_b64);
   g2_free(pk);
