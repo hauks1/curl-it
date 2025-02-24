@@ -4,8 +4,8 @@
 #include <relic/relic.h>
 
 #define TEST_DATABASE "test.db"
-#define DEVICE_ID "device_id"
-#define NUM_DATA_POINTS 30
+#define DEVICE_ID "12345"
+#define NUM_DATA_POINTS 5
 #define NUM_MESSAGES 1
 #define FUNC "doubling"
 
