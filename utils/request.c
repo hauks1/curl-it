@@ -13,6 +13,53 @@
 #include <math.h>
 #include "request.h"
 
+int prepare_raw_req_server(cJSON *json_obj,raw_message_t *message,dig_t data_points[], size_t num_data_points, dig_t scale){
+    // JSON setup and sending
+    cJSON *signatures = cJSON_CreateArray();
+    cJSON *messages = cJSON_CreateArray();
+    cJSON *tags = cJSON_CreateArray();
+    cJSON *data_set_id = cJSON_CreateString(TEST_DATABASE);
+    cJSON *scale_json = cJSON_CreateNumber(scale);
+
+    for(size_t i=0; i < num_data_points; i++){
+        cJSON *datapoint = cJSON_CreateNumber(data_points[i]);
+        cJSON_AddItemToArray(messages, datapoint);
+        cJSON *tag = cJSON_CreateString(message->tags[i]);
+        cJSON_AddItemToArray(tags, tag);
+    }
+    cJSON *id = cJSON_CreateString(message->ids[0]);
+    cJSON_AddItemToObject(json_obj, "id",id);
+    cJSON_AddItemToObject(json_obj, "datapoints", messages);
+    if (messages == NULL) {
+        fprintf(stderr, "Failed to create JSON array for messages\n");
+        cJSON_Delete(json_obj);
+        return -1;
+    }
+    if (id == NULL) {
+        fprintf(stderr, "Failed to create JSON array for ids\n");
+        cJSON_Delete(json_obj);
+        return -1;
+    }
+    cJSON_AddItemToObject(json_obj, "tags", tags);
+    if (tags == NULL) {
+        fprintf(stderr, "Failed to create JSON array for tags\n");
+        cJSON_Delete(json_obj);
+        return -1;
+    }
+    cJSON_AddItemToObject(json_obj, "data_set_id", data_set_id);
+    if (data_set_id == NULL) {
+        fprintf(stderr, "Failed to create JSON string for data_set_id\n");
+        cJSON_Delete(json_obj);
+        return -1;
+    }
+    cJSON_AddItemToObject(json_obj, "scale", scale_json);
+    if (scale_json == NULL) {
+        fprintf(stderr, "Failed to create JSON number for scale\n");
+        cJSON_Delete(json_obj);
+        return -1;
+    }
+    return 0;
+}
 int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *master_decoded_sig_buf[],dig_t data_points[], size_t num_data_points, char *pk_b64,int sig_len,u_int64_t scale,char *func){
     // JSON setup and sending
     cJSON *signatures = cJSON_CreateArray();

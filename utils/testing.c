@@ -62,9 +62,14 @@ void print_config(test_config_t test_config){
 /* ------- Log to file -----------*/
 int log_metrics_to_csv(test_config_t *test_config, metrics_t *metrics){
 
+    char filename[sizeof(metrics->operation_name)+ 9];
+    if (!test_config->is_sig){
+        sprintf(filename,"%s_raw.csv",metrics->operation_name);
+    }
+    else{
+        sprintf(filename,"%s.csv",metrics->operation_name);
+    }
     // Format file to csv file name based on operation
-    char filename[sizeof(metrics->operation_name)+ 5];
-    sprintf(filename,"%s.csv",metrics->operation_name);
     FILE *file = fopen(filename,"a");
     if(!file){
         fprintf(stderr,"Failed to open file\n");
