@@ -15,7 +15,6 @@
 
 int prepare_raw_req_server(cJSON *json_obj,raw_message_t *message,dig_t data_points[], size_t num_data_points, dig_t scale){
     // JSON setup and sending
-    cJSON *signatures = cJSON_CreateArray();
     cJSON *messages = cJSON_CreateArray();
     cJSON *tags = cJSON_CreateArray();
     cJSON *data_set_id = cJSON_CreateString(TEST_DATABASE);

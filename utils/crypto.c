@@ -98,13 +98,13 @@ char* base64_encode(const char* input, int length) {
 
     return encoded;
 }
+
 int gen_keys(bn_t sk, g2_t pk){
-    
     bn_null(sk);
     bn_new(sk);
     g2_null(pk);
     g2_new(pk);
-
+    
     int res = cp_mklhs_gen(sk,pk);
     if(res != RLC_OK){
         return -1;

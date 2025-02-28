@@ -1,6 +1,7 @@
 #include "relic/relic.h"
 #include "utils/crypto.h"
 #include "utils/request.h"
+#include "utils/memory.h"
 #include "utils/testing.h"
 #include <assert.h>
 #include <cjson/cJSON.h>
@@ -9,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uuid/uuid.h>
+
 
 /* Function to initialize the messages */
 int init_message(message_t *message, dig_t data_points[],
@@ -140,10 +142,12 @@ void print_usage(char *program_name)
   printf("  --float          Generate float data points\n");
   printf("  --iterations N   Run N iterations (default: 1000)\n");
   printf("  --test           Enable performance testing mode\n");
+  printf("  --memory           Enable memory testing mode\n");
   printf("  --raw            Send raw data without signatures\n");
   printf("  --verbose        Enable verbose output\n");
   printf("  --help           Display this help message\n");
 }
+
 
 /* MAIN */
 int main(int argc, char *argv[])
@@ -154,6 +158,7 @@ int main(int argc, char *argv[])
   int test_mode = 0;
   int verbose = 0;
   int raw_mode = 0;
+  int memory_mode = 0;
   int iterations_count = 1000;
 
   for (int i = 1; i < argc; i++)
@@ -170,9 +175,9 @@ int main(int argc, char *argv[])
     {
       raw_mode = 1;
     }
-    else if (strcmp(argv[i], "--verbose") == 0)
+    else if (strcmp(argv[i], "--memory") == 0)
     {
-      verbose = 1;
+      memory_mode = 1;
     }
     else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc)
     {
@@ -191,16 +196,6 @@ int main(int argc, char *argv[])
       return 1;
     }
   }
-
-  if (verbose)
-  {
-    printf("Configuration:\n");
-    printf("- Iterations: %d\n", iterations_count);
-    printf("- Testing mode: %s\n", test_mode ? "enabled" : "disabled");
-    printf("- Data type: %s\n", use_float ? "float" : "integer");
-    printf("- Signature mode: %s\n", raw_mode ? "disabled (raw data)" : "enabled");
-  }
-
   /* Initialize the RELIC library if we're using signatures */
   g2_t pk;
   bn_t sk;
@@ -208,7 +203,6 @@ int main(int argc, char *argv[])
 
   if (!raw_mode)
   {
-
     /* Generate the secret and public key */
     g2_null(pk);
     bn_null(sk);
@@ -216,13 +210,13 @@ int main(int argc, char *argv[])
     bn_new(sk);
 
     /* Generate key pair */
-    int res = gen_keys(sk, pk);
+    int res = gen_keys(sk,pk);
     if (res != 0)
     {
       fprintf(stderr, "Failed to generate keys\n");
       return -1;
     }
-
+    g2_print(pk);
     /* Format and encode the public key */
     int pk_len = g2_size_bin(pk, 1);
     unsigned char pk_buf[pk_len];
@@ -242,14 +236,6 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Could not allocate data points\n");
       return -1;
     }
-
-    /* Start measuring end-to-end latency if in test mode */
-    clock_t start_end_to_end;
-    if (test_mode)
-    {
-      start_end_to_end = clock();
-    }
-
     /* Generate data points based on arguments */
     if (use_float)
     {
@@ -273,8 +259,6 @@ int main(int argc, char *argv[])
     }
     else
     {
-      if (verbose)
-        printf("Generating integer data points...\n");
       int gen_res = gen_dig_data_points(data_points, NUM_DATA_POINTS);
       if (gen_res != 0)
       {
@@ -291,7 +275,6 @@ int main(int argc, char *argv[])
       free(data_points);
       return -1;
     }
-
     if (raw_mode)
     {
       /* Raw data mode - skip signatures */
@@ -303,7 +286,6 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-
       /* Initialize the message */
       int init_res = init_raw_message(message, data_points, NUM_DATA_POINTS);
       if (init_res != 0)
@@ -314,19 +296,6 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-      if (verbose) printf("Preparing raw data request...\n");
-      /* Perform testing if in test mode */
-      metrics_t raw_metrics;
-      test_config_t test_config = {
-          .num_data_points = NUM_DATA_POINTS,
-          .num_messages = MAX_ITERATIONS,
-          .scale = scale,
-          .is_sig = 0,
-      };
-      clock_t start_raw, end_raw;
-      if (test_mode){
-        start_raw = clock();
-      }
       int prepare_res = prepare_raw_req_server(json_obj, message, data_points, NUM_DATA_POINTS, scale);
       if (prepare_res != 0)
       {
@@ -334,11 +303,6 @@ int main(int argc, char *argv[])
         cJSON_Delete(json_obj);
         free(data_points);
         return -1;
-      }
-      if(test_mode){
-        end_raw = clock();
-        raw_metrics = get_metrics(start_raw,end_raw,sizeof(raw_message_t),"prepare",test_config);
-        log_metrics_to_csv(&test_config,&raw_metrics);
       }
       /* Clean up message resources */
       cleanup_raw_message(message, NUM_DATA_POINTS);
@@ -366,22 +330,8 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-      /* Perform testing if in test mode */
-      metrics_t signing_metrics, encoding_metrics, preparing_metrics;
-      test_config_t test_config = {
-          .num_data_points = NUM_DATA_POINTS,
-          .num_messages = MAX_ITERATIONS,
-          .scale = scale,
-          .is_sig = 1,
-      };
-
+      
       /* Sign the data points */
-      clock_t start_sig, end_sig;
-      if (test_mode)
-      {
-        start_sig = clock();
-      }
-
       int sign_res = sign_data_points(message, sk, NUM_DATA_POINTS);
       if (sign_res != 0)
       {
@@ -392,25 +342,14 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-
-      if (test_mode)
-      {
-        end_sig = clock();
-        signing_metrics = get_metrics(start_sig, end_sig, sizeof(message_t), "signing", test_config);
-        log_metrics_to_csv(&test_config, &signing_metrics);
-      }
-
       /* Encode signatures */
       unsigned char *master_sig_buf[NUM_DATA_POINTS];
       char *master_decoded_sig_buf[NUM_DATA_POINTS];
       clock_t start_encode, end_encode;
 
-      if (test_mode)
-      {
-        start_encode = clock();
-      }
-
       int sig_len = g1_size_bin(message->sigs[0], 1);
+      if(memory_mode) profile_encode_signatures(message, master_sig_buf,
+        master_decoded_sig_buf, NUM_DATA_POINTS);
       int encode_res = encode_signatures(message, master_sig_buf,
                                          master_decoded_sig_buf, NUM_DATA_POINTS);
       if (encode_res != 0)
@@ -422,21 +361,7 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-
-      if (test_mode)
-      {
-        end_encode = clock();
-        encoding_metrics = get_metrics(start_encode, end_encode, sizeof(message_t), "encoding", test_config);
-        log_metrics_to_csv(&test_config, &encoding_metrics);
-      }
-
       /* Prepare request */
-      clock_t start_prepare, end_prepare;
-      if (test_mode)
-      {
-        start_prepare = clock();
-      }
-
       int prepare = prepare_request_server(
           json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
           pk_b64, sig_len, scale, FUNC);
@@ -449,14 +374,6 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-
-      if (test_mode)
-      {
-        end_prepare = clock();
-        preparing_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t), "preparing", test_config);
-        log_metrics_to_csv(&test_config, &preparing_metrics);
-      }
-
       /* Clean up message resources */
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
@@ -469,8 +386,6 @@ int main(int argc, char *argv[])
     }
 
     /* Send to server */
-    if (verbose)
-      printf("Sending request to server...\n");
     int curl_res;
     if (!raw_mode)
     {
@@ -495,34 +410,12 @@ int main(int argc, char *argv[])
       }
     }
 
-    /* Print end-to-end metrics if in test mode */
-    if (test_mode)
-    {
-      clock_t end_end_to_end = clock();
-      printf("-------End to end latency metrics-------\n");
-      printf("End to end latency: %f\n", calculate_latency(end_end_to_end - start_end_to_end, 1));
-    }
-
     /* Cleanup for this iteration */
     cJSON_Delete(json_obj);
     free(data_points);
 
     iterations++;
-
-    if (verbose && iterations % 100 == 0)
-    {
-      printf("Completed %d/%d iterations\n", iterations, iterations_count);
-    }
+    sleep(2);
   }
-
-  /* Final cleanup */
-  if (!raw_mode)
-  {
-    free(pk_b64);
-    g2_free(pk);
-    bn_free(sk);
-    relic_cleanup();
-  }
-
   return 0;
 }
