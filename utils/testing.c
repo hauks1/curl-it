@@ -37,7 +37,6 @@ metrics_t get_metrics(clock_t start, clock_t end, size_t size,char *operation_na
     metrics.kb_per_second = calculate_throughput_kb(size,metrics.latency_ms);
     metrics.total_bytes = size;
     strncpy(metrics.operation_name, operation_name, sizeof(metrics.operation_name)-1);
-    printf("Operation name: %s\n",metrics.operation_name);
     metrics.operation_name[sizeof(metrics.operation_name)-1] = '\0';
     metrics.num_operations = test_config.num_data_points;
     metrics.total_time_ms = metrics.latency_ms;

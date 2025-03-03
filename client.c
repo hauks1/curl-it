@@ -2,8 +2,6 @@
 #include "utils/crypto.h"
 #include "utils/request.h"
 #include "utils/memory.h"
-#include "utils/testing.h"
-#include <assert.h>
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
 #include <stdio.h>
@@ -11,6 +9,9 @@
 #include <string.h>
 #include <uuid/uuid.h>
 
+#ifdef TEST_MODE
+#include "utils/testing.h"
+#endif
 
 /* Function to initialize the messages */
 int init_message(message_t *message, dig_t data_points[],
@@ -52,7 +53,7 @@ int init_message(message_t *message, dig_t data_points[],
 
 /* Function to init raw messages aka wihtout a signature */
 int init_raw_message(raw_message_t *message, dig_t data_points[],
-                 size_t num_data_points)
+                     size_t num_data_points)
 {
   if (message == NULL)
   {
@@ -132,7 +133,6 @@ void cleanup_raw_message(raw_message_t *message, size_t num_data_points)
   {
     bn_free(message->data_points[i]);
   }
- 
 }
 
 void print_usage(char *program_name)
@@ -147,7 +147,6 @@ void print_usage(char *program_name)
   printf("  --verbose        Enable verbose output\n");
   printf("  --help           Display this help message\n");
 }
-
 
 /* MAIN */
 int main(int argc, char *argv[])
@@ -196,13 +195,30 @@ int main(int argc, char *argv[])
       return 1;
     }
   }
-  /* Initialize the RELIC library if we're using signatures */
+#ifdef TEST_MODE
+#include "utils/testing.h"
+  // Initialize test config
+  test_config_t test_config;
+  test_config.num_data_points = NUM_DATA_POINTS;
+  test_config.num_messages = 1;
+  test_config.scale = 1;
+  test_config.is_sig = raw_mode ? 0 : 1;
+
+  // Start end-to-end measurements
+  clock_t start_ete, end_ete;
+  start_ete = clock();
+  printf("Running in TESTING MODE\n");
+#endif
+
   g2_t pk;
   bn_t sk;
   char *pk_b64 = NULL;
 
   if (!raw_mode)
   {
+#ifdef TEST_MODE
+    clock_t start_setup_keys = clock();
+#endif
     /* Generate the secret and public key */
     g2_null(pk);
     bn_null(sk);
@@ -210,18 +226,23 @@ int main(int argc, char *argv[])
     bn_new(sk);
 
     /* Generate key pair */
-    int res = gen_keys(sk,pk);
+    int res = gen_keys(sk, pk);
     if (res != 0)
     {
       fprintf(stderr, "Failed to generate keys\n");
       return -1;
     }
-    g2_print(pk);
     /* Format and encode the public key */
     int pk_len = g2_size_bin(pk, 1);
+    int sk_len = bn_size_bin(sk);
     unsigned char pk_buf[pk_len];
     g2_write_bin(pk_buf, pk_len, pk, 1);
     pk_b64 = base64_encode((char *)pk_buf, pk_len);
+#ifdef TEST_MODE
+    clock_t end_setup_keys = clock();
+    metrics_t setup_keys = get_metrics(start_setup_keys, end_setup_keys, pk_len + sk_len, "setup_keys", test_config);
+    log_metrics_to_csv(&test_config, &setup_keys);
+#endif
   }
 
   int iterations = 0;
@@ -286,6 +307,11 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
+      /* PREPARE STAGE */
+#ifdef TEST_MODE
+      clock_t start_prepare_raw, end_prepare_raw;
+      start_prepare_raw = clock();
+#endif
       /* Initialize the message */
       int init_res = init_raw_message(message, data_points, NUM_DATA_POINTS);
       if (init_res != 0)
@@ -304,6 +330,12 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
+#ifdef TEST_MODE
+      size_t json_obj_size = strlen(cJSON_Print(json_obj));
+      end_prepare_raw = clock();
+      metrics_t prepare_raw_metrics = get_metrics(start_prepare_raw, end_prepare_raw, json_obj_size, "prepare", test_config);
+      log_metrics_to_csv(&test_config, &prepare_raw_metrics);
+#endif
       /* Clean up message resources */
       cleanup_raw_message(message, NUM_DATA_POINTS);
       free(message);
@@ -330,7 +362,10 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
-      
+#ifdef TEST_MODE
+      clock_t start_sign, end_sign;
+      start_sign = clock();
+#endif
       /* Sign the data points */
       int sign_res = sign_data_points(message, sk, NUM_DATA_POINTS);
       if (sign_res != 0)
@@ -342,14 +377,20 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
+#ifdef TEST_MODE
+      end_sign = clock();
+      metrics_t sign_metrics = get_metrics(start_sign, end_sign, sizeof(message_t), "sign", test_config);
+      log_metrics_to_csv(&test_config, &sign_metrics);
+#endif
+
       /* Encode signatures */
       unsigned char *master_sig_buf[NUM_DATA_POINTS];
       char *master_decoded_sig_buf[NUM_DATA_POINTS];
+#ifdef TEST_MODE
       clock_t start_encode, end_encode;
-
+      start_encode = clock();
+#endif
       int sig_len = g1_size_bin(message->sigs[0], 1);
-      if(memory_mode) profile_encode_signatures(message, master_sig_buf,
-        master_decoded_sig_buf, NUM_DATA_POINTS);
       int encode_res = encode_signatures(message, master_sig_buf,
                                          master_decoded_sig_buf, NUM_DATA_POINTS);
       if (encode_res != 0)
@@ -361,6 +402,15 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
+#ifdef TEST_MODE
+      end_encode = clock();
+      metrics_t encode_metrics = get_metrics(start_encode, end_encode, sizeof(message_t), "encode", test_config);
+      log_metrics_to_csv(&test_config, &encode_metrics);
+#endif
+#ifdef TEST_MODE
+      clock_t start_prepare, end_prepare;
+      start_prepare = clock();
+#endif
       /* Prepare request */
       int prepare = prepare_request_server(
           json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
@@ -374,6 +424,11 @@ int main(int argc, char *argv[])
         free(data_points);
         return -1;
       }
+#ifdef TEST_MODE
+      end_prepare = clock();
+      metrics_t prepare_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t), "prepare", test_config);
+      log_metrics_to_csv(&test_config, &prepare_metrics);
+#endif
       /* Clean up message resources */
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
@@ -387,6 +442,9 @@ int main(int argc, char *argv[])
 
     /* Send to server */
     int curl_res;
+#ifdef TEST_MODE
+    clock_t start_req = clock();
+#endif
     if (!raw_mode)
     {
       curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
@@ -409,13 +467,22 @@ int main(int argc, char *argv[])
         return -1;
       }
     }
+#ifdef TEST_MODE
+    clock_t end_req = clock();
+    end_ete = clock();
+    size_t size_json = strlen(cJSON_Print(json_obj));
+    metrics_t request_metrics = get_metrics(start_req, end_req, strlen(cJSON_Print(json_obj)), "request", test_config);
+    log_metrics_to_csv(&test_config, &request_metrics);
+    // end-to-end metrics
+    metrics_t ete_metrics = get_metrics(start_ete, end_ete, size_json, "end-to-end", test_config);
+    log_metrics_to_csv(&test_config, &ete_metrics);
+#endif
 
     /* Cleanup for this iteration */
     cJSON_Delete(json_obj);
     free(data_points);
 
     iterations++;
-    sleep(2);
   }
   return 0;
 }
