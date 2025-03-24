@@ -1,7 +1,24 @@
 #ifndef CRYPTO_H
 #define CRYPTO_H
-
 #include <relic/relic.h> // Include the Relic library header
+
+/* Structure to hold LOVE precomputation data */
+typedef struct love_data
+{
+    bn_t r;  // Random scalar for LOVE
+    g1_t u1; // Random G1 element
+    g2_t u2; // Random G2 element
+    g2_t v2; // Computed G2 element: v2 = (r^-1 mod q) * u2
+    gt_t e;  // Pairing result: e = e(u1, u2)
+    
+    // Base64 encoded versions for transmission
+    char *r_encoded;  // Base64 encoded r
+    char *u1_encoded; // Base64 encoded u1
+    char *u2_encoded; // Base64 encoded u2
+    char *v2_encoded; // Base64 encoded v2
+    char *e_encoded;  // Base64 encoded e
+} love_data_t;
+
 #include "request.h"
 /* The headerfile for the crypto_utils*/
 int relic_init();

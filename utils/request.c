@@ -12,6 +12,7 @@
 #include <time.h>
 #include <math.h>
 #include "request.h"
+#include "crypto.h"
 
 int prepare_raw_req_server(cJSON *json_obj,raw_message_t *message,dig_t data_points[], size_t num_data_points, dig_t scale){
     // JSON setup and sending
@@ -129,6 +130,23 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
     }
     return 0;
 }
+
+int add_love_data_json(cJSON *json,love_data_t *data){
+    if (json == NULL || data == NULL) {
+        fprintf(stderr, "JSON or LOVE data pointer is NULL\n");
+        printf("HEre\n");
+        return -1;
+    }
+    // Add the encoded LOVE parameters to the JSON object
+    cJSON_AddStringToObject(json, "love_r", data->r_encoded);
+    cJSON_AddStringToObject(json, "love_u1", data->u1_encoded);
+    cJSON_AddStringToObject(json, "love_u2", data->u2_encoded);
+    cJSON_AddStringToObject(json, "love_v2", data->v2_encoded);
+    cJSON_AddStringToObject(json, "love_e", data->e_encoded);
+    
+    return 0;
+}
+
 int gen_dig_data_points(dig_t data_points[], size_t num_data_points){
     srand(time(NULL)); 
     int range = 40;
@@ -168,6 +186,7 @@ int curl_to_server(const char *url,cJSON *json){
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
             return -1;
         }
+        curl_slist_free_all(headers);
         curl_easy_cleanup(curl_server);
         cJSON_free(json_str); 
         return 0;

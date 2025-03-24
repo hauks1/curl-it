@@ -22,6 +22,7 @@ typedef struct {
 
 typedef struct metrics {
     // Latency metrics
+    double latency;
     double latency_ms; // total latency in milliseconds
     double latency_per_data_point; // average latency per data point
 
@@ -45,6 +46,7 @@ typedef struct test_config {
 
 /* Functions*/
 metrics_t get_metrics(clock_t start, clock_t end, size_t size,char *operation_name,test_config_t test_config);
+metrics_t get_latency_metrics(clock_t start, clock_t end, char *stage_name);
 void print_metric(metrics_t metrics);
 void print_config(test_config_t test_config);
 
@@ -56,12 +58,11 @@ double calculate_throughput_op(int num_op, double time_taken);
 
 /* ------LATENCY--------- */
 void print_latency_metrics(latency_metrics_t metrics);
-latency_metrics_t get_latency_metrics(clock_t start, clock_t end, int num_op, char *stage_name);
 double calculate_latency(clock_t cycles, double num_op);
 
 
 
 /* ------ LOG --------- */
 int log_metrics_to_csv(test_config_t *test_config,metrics_t *metrics);
-
+int log_latency_metrics_to_csv(test_config_t *test_config, metrics_t *metrics);
 #endif 

@@ -21,12 +21,12 @@ void print_latency_metrics(latency_metrics_t metrics){
 double calculate_latency(clock_t cycles, double num_op){
     return (double)cycles*num_op;
 }
-latency_metrics_t get_latency_metrics(clock_t start, clock_t end, int num_op, char *stage_name){
-    latency_metrics_t metrics;
-    metrics.num_operations = num_op;
-    metrics.latency_per_ms = (double)(end - start) *MS / CLOCKS_PER_SEC; // total latency in ms 
-    metrics.latency_per_op = metrics.latency_per_ms / num_op; // average latency per operation
-    strncpy(metrics.stage_name,stage_name,sizeof(metrics.stage_name));
+/* Only giving me the latency in ms after*/
+metrics_t get_latency_metrics(clock_t start, clock_t end, char *stage_name){
+    metrics_t metrics;
+    metrics.latency = (double)(end - start); //clock cycles
+    metrics.latency_ms = (double)(end - start) *MS / CLOCKS_PER_SEC; // total latency in ms 
+    strncpy(metrics.operation_name,stage_name,sizeof(metrics.operation_name));
     return metrics;
 }
 metrics_t get_metrics(clock_t start, clock_t end, size_t size,char *operation_name,test_config_t test_config){
@@ -81,6 +81,30 @@ int log_metrics_to_csv(test_config_t *test_config, metrics_t *metrics){
     }
     // Log metrics to file
     fprintf(file,"%f,%f,%f,%f,%ld\n",metrics->latency_ms,metrics->latency_per_data_point,metrics->operations_per_second,metrics->kb_per_second,metrics->total_bytes);
+    fclose(file);
+    return 0;
+}
+int log_latency_metrics_to_csv(test_config_t *test_config, metrics_t *metrics){
+    char filename[sizeof(metrics->operation_name)+ 9];
+    if (!test_config->is_sig){
+        sprintf(filename,"%s_raw.csv",metrics->operation_name);
+    }
+    else{
+        sprintf(filename,"%s.csv",metrics->operation_name);
+    }
+    // Format file to csv file name based on operation
+    FILE *file = fopen(filename,"a");
+    if(!file){
+        fprintf(stderr,"Failed to open file\n");
+        return -1;
+    }
+    fseek(file,0,SEEK_END);
+    if(ftell(file) == 0){
+        // Format the csv header with operation metrics given name 
+        fprintf(file, "Latency (ms), Latency (clock ticks)\n");
+    }
+    // Log metrics to file
+    fprintf(file,"%f,%f\n",metrics->latency_ms,metrics->latency);
     fclose(file);
     return 0;
 }

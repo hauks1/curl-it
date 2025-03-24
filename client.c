@@ -9,6 +9,9 @@
 #include <string.h>
 #include <uuid/uuid.h>
 
+#define MAX_DATA_POINTS 30
+#define SERVER_URL
+
 #ifdef TEST_MODE
 #include "utils/testing.h"
 #endif
@@ -148,10 +151,125 @@ void print_usage(char *program_name)
   printf("  --help           Display this help message\n");
 }
 
+/* Initialize LOVE data structure */
+int init_love_data(love_data_t *love_data)
+{
+  if (love_data == NULL)
+  {
+    fprintf(stderr, "LOVE data pointer is NULL\n");
+    return -1;
+  }
+
+  // Initialize RELIC elements
+  bn_null(love_data->r);
+  g1_null(love_data->u1);
+  g2_null(love_data->u2);
+  g2_null(love_data->v2);
+  gt_null(love_data->e);
+
+  bn_new(love_data->r);
+  g1_new(love_data->u1);
+  g2_new(love_data->u2);
+  g2_new(love_data->v2);
+  gt_new(love_data->e);
+
+  // Initialize encoded fields to NULL
+  love_data->r_encoded = NULL;
+  love_data->u1_encoded = NULL;
+  love_data->u2_encoded = NULL;
+  love_data->v2_encoded = NULL;
+  love_data->e_encoded = NULL;
+
+  return 0;
+}
+
+/* Clean up LOVE data structure */
+void cleanup_love_data(love_data_t *love_data)
+{
+  if (love_data == NULL)
+  {
+    return;
+  }
+
+  // Free RELIC elements
+  bn_free(love_data->r);
+  g1_free(love_data->u1);
+  g2_free(love_data->u2);
+  g2_free(love_data->v2);
+  gt_free(love_data->e);
+
+  // Free encoded strings
+  if (love_data->r_encoded)
+    free(love_data->r_encoded);
+  if (love_data->u1_encoded)
+    free(love_data->u1_encoded);
+  if (love_data->u2_encoded)
+    free(love_data->u2_encoded);
+  if (love_data->v2_encoded)
+    free(love_data->v2_encoded);
+  if (love_data->e_encoded)
+    free(love_data->e_encoded);
+}
+/* Generate LOVE precomputation parameters */
+int generate_love_precomputation(love_data_t *love_data)
+{
+  if (love_data == NULL)
+  {
+    fprintf(stderr, "LOVE data pointer is NULL\n");
+    return -1;
+  }
+
+  // Generate LOVE precomputation using the struct fields
+  int result = cp_lvpub_gen(love_data->r, love_data->u1, love_data->u2,
+                            love_data->v2, love_data->e);
+
+  if (result != RLC_OK)
+  {
+    fprintf(stderr, "LOVE precomputation failed\n");
+    return -1;
+  }
+
+  // Encode the parameters for transmission
+  int r_len = bn_size_bin(love_data->r);
+  unsigned char r_buf[r_len];
+  bn_write_bin(r_buf, r_len, love_data->r);
+  love_data->r_encoded = base64_encode((char *)r_buf, r_len);
+
+  int u1_len = g1_size_bin(love_data->u1, 1);
+  unsigned char u1_buf[u1_len];
+  g1_write_bin(u1_buf, u1_len, love_data->u1, 1);
+  love_data->u1_encoded = base64_encode((char *)u1_buf, u1_len);
+
+  int u2_len = g2_size_bin(love_data->u2, 1);
+  unsigned char u2_buf[u2_len];
+  g2_write_bin(u2_buf, u2_len, love_data->u2, 1);
+  love_data->u2_encoded = base64_encode((char *)u2_buf, u2_len);
+
+  int v2_len = g2_size_bin(love_data->v2, 1);
+  unsigned char v2_buf[v2_len];
+  g2_write_bin(v2_buf, v2_len, love_data->v2, 1);
+  love_data->v2_encoded = base64_encode((char *)v2_buf, v2_len);
+
+  int e_len = gt_size_bin(love_data->e, 1);
+  unsigned char e_buf[e_len];
+  gt_write_bin(e_buf, e_len, love_data->e, 1);
+  love_data->e_encoded = base64_encode((char *)e_buf, e_len);
+
+  return 0;
+}
 /* MAIN */
 int main(int argc, char *argv[])
 {
-  relic_init();
+#ifdef TEST_MODE
+#include "utils/testing.h"
+  // Initialize test config
+  test_config_t test_config;
+  test_config.num_data_points = NUM_DATA_POINTS;
+  test_config.num_messages = 1;
+  test_config.scale = 1;
+  test_config.is_sig = 1;
+  printf("Running in TESTING MODE\n");
+#endif
   /* Parse command line arguments */
   int use_float = 0;
   int test_mode = 0;
@@ -195,20 +313,6 @@ int main(int argc, char *argv[])
       return 1;
     }
   }
-#ifdef TEST_MODE
-#include "utils/testing.h"
-  // Initialize test config
-  test_config_t test_config;
-  test_config.num_data_points = NUM_DATA_POINTS;
-  test_config.num_messages = 1;
-  test_config.scale = 1;
-  test_config.is_sig = raw_mode ? 0 : 1;
-
-  // Start end-to-end measurements
-  clock_t start_ete, end_ete;
-  start_ete = clock();
-  printf("Running in TESTING MODE\n");
-#endif
 
   g2_t pk;
   bn_t sk;
@@ -219,6 +323,7 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_setup_keys = clock();
 #endif
+    relic_init();
     /* Generate the secret and public key */
     g2_null(pk);
     bn_null(sk);
@@ -240,14 +345,19 @@ int main(int argc, char *argv[])
     pk_b64 = base64_encode((char *)pk_buf, pk_len);
 #ifdef TEST_MODE
     clock_t end_setup_keys = clock();
-    metrics_t setup_keys = get_metrics(start_setup_keys, end_setup_keys, pk_len + sk_len, "setup_keys", test_config);
-    log_metrics_to_csv(&test_config, &setup_keys);
+    metrics_t setup_keys = get_latency_metrics(start_setup_keys, end_setup_keys, "setup_keys");
+    log_latency_metrics_to_csv(&test_config, &setup_keys);
 #endif
   }
 
   int iterations = 0;
   while (iterations < iterations_count)
   {
+#ifdef TEST_MODE
+    clock_t start_init = clock();
+    clock_t start_ete, end_ete;
+    start_ete = clock();
+#endif
     uint64_t scale = 1;
 
     /* Allocate the data points */
@@ -296,148 +406,123 @@ int main(int argc, char *argv[])
       free(data_points);
       return -1;
     }
-    if (raw_mode)
+    /* Signature mode - create and sign message */
+    message_t *message = (message_t *)malloc(sizeof(message_t));
+    if (message == NULL)
     {
-      /* Raw data mode - skip signatures */
-      raw_message_t *message = (raw_message_t *)malloc(sizeof(raw_message_t));
-      if (message == NULL)
-      {
-        fprintf(stderr, "Could not allocate message\n");
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-      /* PREPARE STAGE */
-#ifdef TEST_MODE
-      clock_t start_prepare_raw, end_prepare_raw;
-      start_prepare_raw = clock();
-#endif
-      /* Initialize the message */
-      int init_res = init_raw_message(message, data_points, NUM_DATA_POINTS);
-      if (init_res != 0)
-      {
-        fprintf(stderr, "Failed to initialize raw message\n");
-        free(message);
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-      int prepare_res = prepare_raw_req_server(json_obj, message, data_points, NUM_DATA_POINTS, scale);
-      if (prepare_res != 0)
-      {
-        fprintf(stderr, "Failed to prepare raw request\n");
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-#ifdef TEST_MODE
-      size_t json_obj_size = strlen(cJSON_Print(json_obj));
-      end_prepare_raw = clock();
-      metrics_t prepare_raw_metrics = get_metrics(start_prepare_raw, end_prepare_raw, json_obj_size, "prepare", test_config);
-      log_metrics_to_csv(&test_config, &prepare_raw_metrics);
-#endif
-      /* Clean up message resources */
-      cleanup_raw_message(message, NUM_DATA_POINTS);
-      free(message);
+      fprintf(stderr, "Could not allocate message\n");
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
     }
-    else
+
+    /* Initialize the message */
+    int init_res = init_message(message, data_points, NUM_DATA_POINTS);
+    if (init_res != 0)
     {
-      /* Signature mode - create and sign message */
-      message_t *message = (message_t *)malloc(sizeof(message_t));
-      if (message == NULL)
-      {
-        fprintf(stderr, "Could not allocate message\n");
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
+      fprintf(stderr, "Failed to initialize message\n");
+      free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+#ifdef TEST_MODE
+    clock_t end_init = clock();
+    metrics_t init_metrics = get_latency_metrics(start_init, end_init, "init");
+    log_latency_metrics_to_csv(&test_config, &init_metrics);
+#endif
+#ifdef TEST_MODE
 
-      /* Initialize the message */
-      int init_res = init_message(message, data_points, NUM_DATA_POINTS);
-      if (init_res != 0)
-      {
-        fprintf(stderr, "Failed to initialize message\n");
-        free(message);
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-#ifdef TEST_MODE
-      clock_t start_sign, end_sign;
-      start_sign = clock();
+    clock_t start_sign, end_sign;
+    start_sign = clock();
 #endif
-      /* Sign the data points */
-      int sign_res = sign_data_points(message, sk, NUM_DATA_POINTS);
-      if (sign_res != 0)
-      {
-        fprintf(stderr, "Failed to sign data points\n");
-        cleanup_message(message, NUM_DATA_POINTS);
-        free(message);
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-#ifdef TEST_MODE
-      end_sign = clock();
-      metrics_t sign_metrics = get_metrics(start_sign, end_sign, sizeof(message_t), "sign", test_config);
-      log_metrics_to_csv(&test_config, &sign_metrics);
-#endif
-
-      /* Encode signatures */
-      unsigned char *master_sig_buf[NUM_DATA_POINTS];
-      char *master_decoded_sig_buf[NUM_DATA_POINTS];
-#ifdef TEST_MODE
-      clock_t start_encode, end_encode;
-      start_encode = clock();
-#endif
-      int sig_len = g1_size_bin(message->sigs[0], 1);
-      int encode_res = encode_signatures(message, master_sig_buf,
-                                         master_decoded_sig_buf, NUM_DATA_POINTS);
-      if (encode_res != 0)
-      {
-        fprintf(stderr, "Failed to encode signatures\n");
-        cleanup_message(message, NUM_DATA_POINTS);
-        free(message);
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-#ifdef TEST_MODE
-      end_encode = clock();
-      metrics_t encode_metrics = get_metrics(start_encode, end_encode, sizeof(message_t), "encode", test_config);
-      log_metrics_to_csv(&test_config, &encode_metrics);
-#endif
-#ifdef TEST_MODE
-      clock_t start_prepare, end_prepare;
-      start_prepare = clock();
-#endif
-      /* Prepare request */
-      int prepare = prepare_request_server(
-          json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
-          pk_b64, sig_len, scale, FUNC);
-      if (prepare != 0)
-      {
-        fprintf(stderr, "Failed to prepare request\n");
-        cleanup_message(message, NUM_DATA_POINTS);
-        free(message);
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-#ifdef TEST_MODE
-      end_prepare = clock();
-      metrics_t prepare_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t), "prepare", test_config);
-      log_metrics_to_csv(&test_config, &prepare_metrics);
-#endif
-      /* Clean up message resources */
+    /* Sign the data points */
+    int sign_res = sign_data_points(message, sk, NUM_DATA_POINTS);
+    if (sign_res != 0)
+    {
+      fprintf(stderr, "Failed to sign data points\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+#ifdef TEST_MODE
+    end_sign = clock();
+    // metrics_t sign_metrics = get_metrics(start_sign, end_sign, sizeof(message_t), "sign", test_config);
+    // log_metrics_to_csv(&test_config, &sign_metrics);
+    metrics_t sign_metrics = get_latency_metrics(start_sign, end_sign, "sign");
+    log_latency_metrics_to_csv(&test_config, &sign_metrics);
+#endif
+    /* Encode signatures */
+    unsigned char *master_sig_buf[NUM_DATA_POINTS];
+    char *master_decoded_sig_buf[NUM_DATA_POINTS];
+#ifdef TEST_MODE
+    clock_t start_encode, end_encode;
+    start_encode = clock();
+#endif
+    int sig_len = g1_size_bin(message->sigs[0], 1);
+    int encode_res = encode_signatures(message, master_sig_buf,
+                                       master_decoded_sig_buf, NUM_DATA_POINTS);
+    if (encode_res != 0)
+    {
+      fprintf(stderr, "Failed to encode signatures\n");
+      cleanup_message(message, NUM_DATA_POINTS);
+      free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+#ifdef TEST_MODE
+    end_encode = clock();
+    // metrics_t encode_metrics = get_metrics(start_encode, end_encode, sizeof(message_t), "encode", test_config);
+    // log_metrics_to_csv(&test_config, &encode_metrics);
+    metrics_t encode_metrics = get_latency_metrics(start_encode, end_encode, "encode");
+    log_latency_metrics_to_csv(&test_config, &encode_metrics);
+#endif
+    love_data_t love_data;
+    init_love_data(&love_data);
+    generate_love_precomputation(&love_data);
 
-      // Free encoded signatures
-      for (int i = 0; i < NUM_DATA_POINTS; i++)
-      {
-        free(master_decoded_sig_buf[i]);
-      }
+#ifdef TEST_MODE
+    clock_t start_prepare, end_prepare;
+    start_prepare = clock();
+#endif
+    /* Prepare request */
+    int prepare = prepare_request_server(
+        json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
+        pk_b64, sig_len, scale, FUNC);
+    if (prepare != 0)
+    {
+      fprintf(stderr, "Failed to prepare request\n");
+      cleanup_message(message, NUM_DATA_POINTS);
+      free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+    int prepare_love = add_love_data_json(json_obj,&love_data);
+    if(prepare_love != 0){
+      fprintf(stderr,"Failed to add love data to the json object\n");
+      return -1;
+    }
+
+#ifdef TEST_MODE
+    end_prepare = clock();
+    // metrics_t prepare_metrics = get_metrics(start_prepare, end_prepare, sizeof(message_t), "prepare", test_config);
+    // log_metrics_to_csv(&test_config, &prepare_metrics);
+    metrics_t prepare_metrics = get_latency_metrics(start_prepare, end_prepare, "prepare");
+    log_latency_metrics_to_csv(&test_config, &prepare_metrics);
+#endif
+    /* Clean up message resources */
+    cleanup_message(message, NUM_DATA_POINTS);
+    free(message);
+
+    // Free encoded signatures
+    for (int i = 0; i < NUM_DATA_POINTS; i++)
+    {
+      free(master_decoded_sig_buf[i]);
+      free(master_sig_buf[i]);
     }
 
     /* Send to server */
@@ -445,37 +530,24 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_req = clock();
 #endif
-    if (!raw_mode)
+    printf("%s\n",cJSON_Print(json_obj));
+    curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
+    if (curl_res != 0)
     {
-      curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
-      if (curl_res != 0)
-      {
-        fprintf(stderr, "Failed to curl to server\n");
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
+      fprintf(stderr, "Failed to curl to server\n");
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
     }
-    else
-    {
-      curl_res = curl_to_server("http://129.242.236.85:12345/raw", json_obj);
-      if (curl_res != 0)
-      {
-        fprintf(stderr, "Failed to curl to server\n");
-        cJSON_Delete(json_obj);
-        free(data_points);
-        return -1;
-      }
-    }
+
 #ifdef TEST_MODE
     clock_t end_req = clock();
     end_ete = clock();
-    size_t size_json = strlen(cJSON_Print(json_obj));
-    metrics_t request_metrics = get_metrics(start_req, end_req, strlen(cJSON_Print(json_obj)), "request", test_config);
-    log_metrics_to_csv(&test_config, &request_metrics);
+    // metrics_t request_metrics = get_metrics(start_req, end_req, strlen(cJSON_Print(json_obj)), "request", test_config);
+    // log_metrics_to_csv(&test_config, &request_metrics);
     // end-to-end metrics
-    metrics_t ete_metrics = get_metrics(start_ete, end_ete, size_json, "end-to-end", test_config);
-    log_metrics_to_csv(&test_config, &ete_metrics);
+    metrics_t ete_metrics = get_latency_metrics(start_ete, end_ete, "client-to-server");
+    log_latency_metrics_to_csv(&test_config, &ete_metrics);
 #endif
 
     /* Cleanup for this iteration */
@@ -484,5 +556,6 @@ int main(int argc, char *argv[])
 
     iterations++;
   }
+  free(pk_b64);
   return 0;
 }
