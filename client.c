@@ -480,10 +480,19 @@ int main(int argc, char *argv[])
     metrics_t encode_metrics = get_latency_metrics(start_encode, end_encode, "encode");
     log_latency_metrics_to_csv(&test_config, &encode_metrics);
 #endif
-    love_data_t love_data;
-    init_love_data(&love_data);
-    generate_love_precomputation(&love_data);
 
+#ifdef TEST_MODE
+    clock_t start_love = clock();
+#endif
+love_data_t love_data;
+init_love_data(&love_data);
+generate_love_precomputation(&love_data);
+
+#ifdef TEST_MODE
+    clock_t end_love = clock();
+    metrics_t love_metrics = get_latency_metrics(start_love, end_love, "love");
+    log_latency_metrics_to_csv(&test_config, &love_metrics);
+#endif
 #ifdef TEST_MODE
     clock_t start_prepare, end_prepare;
     start_prepare = clock();
@@ -530,7 +539,6 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_req = clock();
 #endif
-    printf("%s\n",cJSON_Print(json_obj));
     curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
     if (curl_res != 0)
     {

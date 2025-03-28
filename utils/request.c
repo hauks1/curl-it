@@ -134,7 +134,6 @@ int prepare_request_server(cJSON *json_obj,message_t *message,unsigned char *mas
 int add_love_data_json(cJSON *json,love_data_t *data){
     if (json == NULL || data == NULL) {
         fprintf(stderr, "JSON or LOVE data pointer is NULL\n");
-        printf("HEre\n");
         return -1;
     }
     // Add the encoded LOVE parameters to the JSON object
