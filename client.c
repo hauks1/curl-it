@@ -1,7 +1,11 @@
 #include "relic/relic.h"
-#include "utils/crypto.h"
-#include "utils/request.h"
-#include "utils/memory.h"
+#include "core/send/send.h"
+#include "core/message/message.h"
+#include "core/request/request.h"
+#include "core/crypto/love/love.h"
+#include "core/crypto/mklhs/mklhs.h"
+#include "core/crypto/utils/utils.h"
+
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
 #include <stdio.h>
@@ -9,134 +13,9 @@
 #include <string.h>
 #include <uuid/uuid.h>
 
-#define MAX_DATA_POINTS 30
-#define SERVER_URL
-
 #ifdef TEST_MODE
-#include "utils/testing.h"
+#include "testing/testing.h"
 #endif
-
-/* Function to initialize the messages */
-int init_message(message_t *message, dig_t data_points[],
-                 size_t num_data_points)
-{
-  if (message == NULL)
-  {
-    fprintf(stderr, "Message pointer is NULL\n");
-    return -1;
-  }
-  for (int i = 0; i < num_data_points; i++)
-  {
-    bn_null(message->data_points[i]);
-    bn_new(message->data_points[i]);
-    bn_set_dig(message->data_points[i], data_points[i]);
-
-    // Initialize signature
-    g1_null(message->sigs[i]);
-    g1_new(message->sigs[i]);
-
-    // Create random tag's
-    uuid_t date;
-    uuid_generate_time(date);
-    char date_str[37];
-    uuid_unparse(date, date_str);
-
-    strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
-  }
-  uuid_t uuid;
-  uuid_generate(uuid);
-  char uuid_str[37];
-  uuid_unparse(uuid, uuid_str);
-  strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
-  // Set data_set_id
-  strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
-
-  return 0;
-}
-
-/* Function to init raw messages aka wihtout a signature */
-int init_raw_message(raw_message_t *message, dig_t data_points[],
-                     size_t num_data_points)
-{
-  if (message == NULL)
-  {
-    fprintf(stderr, "Message pointer is NULL\n");
-    return -1;
-  }
-  for (int i = 0; i < num_data_points; i++)
-  {
-    bn_null(message->data_points[i]);
-    bn_new(message->data_points[i]);
-    bn_set_dig(message->data_points[i], data_points[i]);
-
-    // Create random tag's
-    uuid_t date;
-    uuid_generate_time(date);
-    char date_str[37];
-    uuid_unparse(date, date_str);
-
-    strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
-  }
-  uuid_t uuid;
-  uuid_generate(uuid);
-  char uuid_str[37];
-  uuid_unparse(uuid, uuid_str);
-  strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
-  // Set data_set_id
-  strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
-
-  return 0;
-}
-
-/* Function to neatly print a message struct */
-void print_message(message_t *msg)
-{
-  for (int i = 0; i < NUM_DATA_POINTS; i++)
-  {
-    printf("Data point: %d\n", i);
-    bn_print(msg->data_points[i]);
-    printf("Signature: %d\n", i);
-    g1_print(msg->sigs[i]);
-    printf("ID: %s\n", msg->ids[i]);
-    printf("Tag: %s\n", msg->tags[i]);
-  }
-  printf("Data set id: %s\n", msg->data_set_id);
-}
-
-void cleanup_message(message_t *message, size_t num_data_points)
-{
-  if (message == NULL)
-    return;
-
-  for (size_t i = 0; i < num_data_points; i++)
-  {
-    bn_free(message->data_points[i]);
-    g1_free(message->sigs[i]);
-  }
-}
-/* Function to neatly print a message struct */
-void print_raw_message(raw_message_t *msg)
-{
-  for (int i = 0; i < NUM_DATA_POINTS; i++)
-  {
-    printf("Data point: %d\n", i);
-    bn_print(msg->data_points[i]);
-    printf("ID: %s\n", msg->ids[i]);
-    printf("Tag: %s\n", msg->tags[i]);
-  }
-  printf("Data set id: %s\n", msg->data_set_id);
-}
-
-void cleanup_raw_message(raw_message_t *message, size_t num_data_points)
-{
-  if (message == NULL)
-    return;
-
-  for (size_t i = 0; i < num_data_points; i++)
-  {
-    bn_free(message->data_points[i]);
-  }
-}
 
 void print_usage(char *program_name)
 {
@@ -144,119 +23,10 @@ void print_usage(char *program_name)
   printf("Options:\n");
   printf("  --float          Generate float data points\n");
   printf("  --iterations N   Run N iterations (default: 1000)\n");
-  printf("  --test           Enable performance testing mode\n");
-  printf("  --memory           Enable memory testing mode\n");
-  printf("  --raw            Send raw data without signatures\n");
   printf("  --verbose        Enable verbose output\n");
   printf("  --help           Display this help message\n");
 }
 
-/* Initialize LOVE data structure */
-int init_love_data(love_data_t *love_data)
-{
-  if (love_data == NULL)
-  {
-    fprintf(stderr, "LOVE data pointer is NULL\n");
-    return -1;
-  }
-
-  // Initialize RELIC elements
-  bn_null(love_data->r);
-  g1_null(love_data->u1);
-  g2_null(love_data->u2);
-  g2_null(love_data->v2);
-  gt_null(love_data->e);
-
-  bn_new(love_data->r);
-  g1_new(love_data->u1);
-  g2_new(love_data->u2);
-  g2_new(love_data->v2);
-  gt_new(love_data->e);
-
-  // Initialize encoded fields to NULL
-  love_data->r_encoded = NULL;
-  love_data->u1_encoded = NULL;
-  love_data->u2_encoded = NULL;
-  love_data->v2_encoded = NULL;
-  love_data->e_encoded = NULL;
-
-  return 0;
-}
-
-/* Clean up LOVE data structure */
-void cleanup_love_data(love_data_t *love_data)
-{
-  if (love_data == NULL)
-  {
-    return;
-  }
-
-  // Free RELIC elements
-  bn_free(love_data->r);
-  g1_free(love_data->u1);
-  g2_free(love_data->u2);
-  g2_free(love_data->v2);
-  gt_free(love_data->e);
-
-  // Free encoded strings
-  if (love_data->r_encoded)
-    free(love_data->r_encoded);
-  if (love_data->u1_encoded)
-    free(love_data->u1_encoded);
-  if (love_data->u2_encoded)
-    free(love_data->u2_encoded);
-  if (love_data->v2_encoded)
-    free(love_data->v2_encoded);
-  if (love_data->e_encoded)
-    free(love_data->e_encoded);
-}
-/* Generate LOVE precomputation parameters */
-int generate_love_precomputation(love_data_t *love_data)
-{
-  if (love_data == NULL)
-  {
-    fprintf(stderr, "LOVE data pointer is NULL\n");
-    return -1;
-  }
-
-  // Generate LOVE precomputation using the struct fields
-  int result = cp_lvpub_gen(love_data->r, love_data->u1, love_data->u2,
-                            love_data->v2, love_data->e);
-
-  if (result != RLC_OK)
-  {
-    fprintf(stderr, "LOVE precomputation failed\n");
-    return -1;
-  }
-
-  // Encode the parameters for transmission
-  int r_len = bn_size_bin(love_data->r);
-  unsigned char r_buf[r_len];
-  bn_write_bin(r_buf, r_len, love_data->r);
-  love_data->r_encoded = base64_encode((char *)r_buf, r_len);
-
-  int u1_len = g1_size_bin(love_data->u1, 1);
-  unsigned char u1_buf[u1_len];
-  g1_write_bin(u1_buf, u1_len, love_data->u1, 1);
-  love_data->u1_encoded = base64_encode((char *)u1_buf, u1_len);
-
-  int u2_len = g2_size_bin(love_data->u2, 1);
-  unsigned char u2_buf[u2_len];
-  g2_write_bin(u2_buf, u2_len, love_data->u2, 1);
-  love_data->u2_encoded = base64_encode((char *)u2_buf, u2_len);
-
-  int v2_len = g2_size_bin(love_data->v2, 1);
-  unsigned char v2_buf[v2_len];
-  g2_write_bin(v2_buf, v2_len, love_data->v2, 1);
-  love_data->v2_encoded = base64_encode((char *)v2_buf, v2_len);
-
-  int e_len = gt_size_bin(love_data->e, 1);
-  unsigned char e_buf[e_len];
-  gt_write_bin(e_buf, e_len, love_data->e, 1);
-  love_data->e_encoded = base64_encode((char *)e_buf, e_len);
-
-  return 0;
-}
 /* MAIN */
 int main(int argc, char *argv[])
 {
@@ -272,10 +42,7 @@ int main(int argc, char *argv[])
 #endif
   /* Parse command line arguments */
   int use_float = 0;
-  int test_mode = 0;
   int verbose = 0;
-  int raw_mode = 0;
-  int memory_mode = 0;
   int iterations_count = 1000;
 
   for (int i = 1; i < argc; i++)
@@ -283,18 +50,6 @@ int main(int argc, char *argv[])
     if (strcmp(argv[i], "--float") == 0)
     {
       use_float = 1;
-    }
-    else if (strcmp(argv[i], "--test") == 0)
-    {
-      test_mode = 1;
-    }
-    else if (strcmp(argv[i], "--raw") == 0)
-    {
-      raw_mode = 1;
-    }
-    else if (strcmp(argv[i], "--memory") == 0)
-    {
-      memory_mode = 1;
     }
     else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc)
     {
@@ -318,37 +73,39 @@ int main(int argc, char *argv[])
   bn_t sk;
   char *pk_b64 = NULL;
 
-  if (!raw_mode)
-  {
 #ifdef TEST_MODE
-    clock_t start_setup_keys = clock();
+  clock_t start_setup_keys = clock();
 #endif
-    relic_init();
-    /* Generate the secret and public key */
-    g2_null(pk);
-    bn_null(sk);
-    g2_new(pk);
-    bn_new(sk);
+  relic_init();
+  /* Generate the secret and public key */
+  g2_null(pk);
+  bn_null(sk);
+  g2_new(pk);
+  bn_new(sk);
 
-    /* Generate key pair */
-    int res = gen_keys(sk, pk);
-    if (res != 0)
-    {
-      fprintf(stderr, "Failed to generate keys\n");
-      return -1;
-    }
-    /* Format and encode the public key */
-    int pk_len = g2_size_bin(pk, 1);
-    int sk_len = bn_size_bin(sk);
-    unsigned char pk_buf[pk_len];
-    g2_write_bin(pk_buf, pk_len, pk, 1);
-    pk_b64 = base64_encode((char *)pk_buf, pk_len);
-#ifdef TEST_MODE
-    clock_t end_setup_keys = clock();
-    metrics_t setup_keys = get_latency_metrics(start_setup_keys, end_setup_keys, "setup_keys");
-    log_latency_metrics_to_csv(&test_config, &setup_keys);
-#endif
+  /* Generate key pair */
+  int res = gen_keys(sk, pk);
+  if (res != 0)
+  {
+    fprintf(stderr, "Failed to generate keys\n");
+    return -1;
   }
+  /* Format and encode the public key */
+  int pk_len = g2_size_bin(pk, 1);
+  unsigned char pk_buf[pk_len];
+  g2_write_bin(pk_buf, pk_len, pk, 1);
+  pk_b64 = base64_encode((char *)pk_buf, pk_len);
+  if (pk_b64 == NULL)
+  {
+    fprintf(stderr, "Failed to encode public key\n");
+    return -1;
+  }
+
+#ifdef TEST_MODE
+  clock_t end_setup_keys = clock();
+  metrics_t setup_keys = get_latency_metrics(start_setup_keys, end_setup_keys, "setup_keys");
+  log_latency_metrics_to_csv(&test_config, &setup_keys);
+#endif
 
   int iterations = 0;
   while (iterations < iterations_count)
@@ -484,9 +241,9 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_love = clock();
 #endif
-love_data_t love_data;
-init_love_data(&love_data);
-generate_love_precomputation(&love_data);
+    love_data_t love_data;
+    init_love_data(&love_data);
+    generate_love_precomputation(&love_data);
 
 #ifdef TEST_MODE
     clock_t end_love = clock();
@@ -510,9 +267,10 @@ generate_love_precomputation(&love_data);
       free(data_points);
       return -1;
     }
-    int prepare_love = add_love_data_json(json_obj,&love_data);
-    if(prepare_love != 0){
-      fprintf(stderr,"Failed to add love data to the json object\n");
+    int prepare_love = add_love_data_json(json_obj, &love_data);
+    if (prepare_love != 0)
+    {
+      fprintf(stderr, "Failed to add love data to the json object\n");
       return -1;
     }
 
