@@ -76,6 +76,8 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
   clock_t start_setup_keys = clock();
 #endif
+  // test_connection();
+  int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
   relic_init();
   /* Generate the secret and public key */
   g2_null(pk);
@@ -297,15 +299,34 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_req = clock();
 #endif
-    curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
-    if (curl_res != 0)
+    // curl_res = curl_to_server("http://129.242.236.85:12345/new", json_obj);
+    // if (curl_res != 0)
+    // {
+    //   fprintf(stderr, "Failed to curl to server\n");
+    //   cJSON_Delete(json_obj);
+    //   free(data_points);
+    //   return -1;
+    // }
+    char request[BUFFER_SIZE];
+    request_t req;
+    if (setup_POST(request, sockfd, &req, cJSON_Print(json_obj), "/new", SERVER_IP) != 0)
     {
-      fprintf(stderr, "Failed to curl to server\n");
+      fprintf(stderr, "Failed to setup POST request\n");
       cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
-
+    char response[BUFFER_SIZE];
+    int res = http_POST(response, &req, sizeof(response));
+    if (res < 0)
+    {
+      fprintf(stderr, "Failed to send POST request\n");
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+    // Print the response
+    printf("Response: %s\n", response);
 #ifdef TEST_MODE
     clock_t end_req = clock();
     end_ete = clock();

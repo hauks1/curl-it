@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -I. -fstack-usage 
+CFLAGS = -Wall -g -I. 
 LIBS = -lrelic -lcurl -lcjson -l:libb64.a -luuid -pthread
 
 SOURCES = client.c \
