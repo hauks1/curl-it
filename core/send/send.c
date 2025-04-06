@@ -247,10 +247,8 @@ int http_GET(char *response, request_t *req, size_t response_size)
     if (req->socket < 0)
         return -1;
 
-    // Cached static request buffer
     static char request[BUFFER_SIZE];
 
-    // Inline the format_GET_request functionality for speed
     int req_len = format_GET_request(request, req);
     if (req_len < 0)
         return -1;
@@ -276,7 +274,7 @@ int http_GET(char *response, request_t *req, size_t response_size)
         return bytes_received;
 
     // Parse content length
-    int content_length = atoi(cl_header + 16);
+    int content_length = bad_atoi(cl_header + 16);
     size_t header_size = (body_start + 4) - response;
     size_t body_received = bytes_received - header_size;
 
