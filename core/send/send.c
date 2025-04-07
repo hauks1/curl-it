@@ -1,12 +1,17 @@
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
+#include <errno.h>
 
 #include "send.h"
+#include "../utils/bad_string.h"
+#include "../utils/base64.h"
+#include <stdio.h>
 
 int curl_to_server(const char *url, cJSON *json)
 {
@@ -40,109 +45,6 @@ int curl_to_server(const char *url, cJSON *json)
     return -1;
 }
 
-// char *strndup(const char *s, size_t n)
-// {
-//     char *buffer = malloc(n + 1);
-//     if (buffer == NULL)
-//         return NULL;
-
-//     for (size_t i = 0; i < n && s[i] != '\0'; i++)
-//         buffer[i] = s[i];
-//     buffer[n] = '\0';
-
-//     return buffer;
-// }
-
-/* BAD string operations library */
-int bad_strlen(const char *s)
-{
-    int len = 0;
-    while (*s++)
-        len++;
-    return len;
-}
-void bad_strcpy(char *dest, const char *src)
-{
-    int i = 0;
-    while ((dest[i] = src[i]) != '\0')
-    {
-        dest[i] = src[i];
-        i++;
-    }
-}
-int bad_strncpy(char *dest, const char *src, size_t n)
-{
-    if (n > bad_strlen(src))
-        return -1;
-    if (n == 0)
-        return -1;
-
-    int i;
-    for (i = 0; i < n - 1 && src[i] != '\0'; i++)
-        dest[i] = src[i];
-
-    dest[n] = '\0';
-    return i;
-}
-int bad_atoi(const char *s)
-{
-    int num = 0;
-    int sign = 1;
-    // check sign
-    if (*s == '-')
-    {
-        sign = -1;
-        s++;
-    }
-    while (*s != '\0')
-    {
-        if (*s < '0' || *s > '9')
-            break;
-        num = num * 10 + (*s - '0');
-        s++;
-    }
-    return num * sign;
-}
-#include <string.h>
-int find_path(char *path, const char *url)
-{
-    if (url == NULL)
-    {
-        perror("Invalid URL\n");
-        return -1;
-    }
-    else if (strstr(url, "/ping") != NULL)
-    {
-        strncpy(path, "/ping", strlen("/ping") + 1);
-        return 0;
-    }
-    else if (strstr(url, "/new") != NULL)
-    {
-        strncpy(path, "/new", strlen("/new") + 1);
-        return 0;
-    }
-    else if (strstr(url, "/metadata") != NULL)
-    {
-        strncpy(path, "/metadata", strlen("/metadata") + 1);
-        return 0;
-    }
-    else if (strstr(url, "/love") != NULL)
-    {
-        strncpy(path, "/love", strlen("/love") + 1);
-        return 0;
-    }
-    else if (strstr(url, "/raw") != NULL)
-    {
-        strncpy(path, "/raw", strlen("/raw") + 1);
-        return 0;
-    }
-    else
-    {
-        perror("Invalid URL\n");
-        return -1;
-    }
-}
-
 int connect_to_server(char *server_ip, int server_port)
 {
     struct sockaddr_in server_addr;
@@ -162,10 +64,12 @@ int connect_to_server(char *server_ip, int server_port)
     }
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-
+        printf("Connection error: %s\n", strerror(errno));
         perror("Connection failed");
+        printf("errno: %d\n", errno);
         return -1;
     }
+    printf("sock: %d\n", sock);
     return sock;
 }
 
@@ -252,13 +156,21 @@ int http_GET(char *response, request_t *req, size_t response_size)
     int req_len = format_GET_request(request, req);
     if (req_len < 0)
         return -1;
-
+    printf("Request: %s\n", request);
     // Send request in a single operation
-    if (send(req->socket, request, req_len, 0) < 0)
+    if (send(req->socket, request, req_len, 0) < 0){
+        printf("Send failed\n");
         return -1;
+
+    }
 
     // Receive response in a single read if possible
     ssize_t bytes_received = recv(req->socket, response, response_size - 1, 0);
+    if (bytes_received < 0)
+    {
+        perror("recv failed");
+        return -1;
+    }
     if (bytes_received <= 0)
         return -1;
 
@@ -307,14 +219,16 @@ int test_connection()
 {
     // Open connection to the server
     int sock;
-    if ((sock = connect_to_server(SERVER_IP, SERVER_PORT)) < 0)
+    if ((sock = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT)) < 0)
     {
-        perror("Failed to connect to server");
+        printf("HERE\n");
+        printf("Failed to connect to server1\n");
         return -1;
     }
+    printf("Sock: %d\n", sock);
     // Create the request
     request_t req;
-    if (create_GET_request(&req, sock, "/ping", SERVER_IP) != 0)
+    if (create_GET_request(&req, sock, "/ping", LOCAL_SERVER_IP) != 0)
     {
         close(sock);
         return -1;
