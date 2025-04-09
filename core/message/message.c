@@ -1,4 +1,5 @@
 #include "message.h"
+#include "../utils/bad_string.h"
 #include <uuid/uuid.h>
 
 int init_message(message_t *message, dig_t data_points[],
@@ -25,15 +26,15 @@ int init_message(message_t *message, dig_t data_points[],
         char date_str[37];
         uuid_unparse(date, date_str);
 
-        strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
+        bad_strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
     }
     uuid_t uuid;
     uuid_generate(uuid);
     char uuid_str[37];
     uuid_unparse(uuid, uuid_str);
-    strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
+    bad_strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID)+1);
     // Set data_set_id
-    strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
+    bad_strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
 
     return 0;
 }

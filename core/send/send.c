@@ -69,7 +69,6 @@ int connect_to_server(char *server_ip, int server_port)
         printf("errno: %d\n", errno);
         return -1;
     }
-    printf("sock: %d\n", sock);
     return sock;
 }
 
@@ -156,7 +155,6 @@ int http_GET(char *response, request_t *req, size_t response_size)
     int req_len = format_GET_request(request, req);
     if (req_len < 0)
         return -1;
-    printf("Request: %s\n", request);
     // Send request in a single operation
     if (send(req->socket, request, req_len, 0) < 0){
         printf("Send failed\n");
@@ -368,8 +366,7 @@ int http_POST(char *response, request_t *req, size_t response_size)
     const char *cl_header = strstr(response, "content-length:");
     if (!cl_header)
     {
-        printf("No Content-Length header found\n");
-        return bytes_received; // No Content-Length header, return what we have
+        return bytes_received; 
     }
 
     // Parse content length

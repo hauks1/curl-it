@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 #include "relic/relic.h"
-#include "parsing.h"
 #include "../crypto/love/love.h"
 #include "../crypto/verify/verify.h"
 

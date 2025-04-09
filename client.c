@@ -1,18 +1,15 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "relic/relic.h"
 #include "core/send/send.h"
+#include "core/request/json.h"
 #include "core/message/message.h"
 #include "core/request/request.h"
 #include "core/crypto/love/love.h"
 #include "core/crypto/mklhs/mklhs.h"
-#include "core/crypto/utils/utils.h"
-#include "core/request/json.h"
-
-#include <cjson/cJSON.h>
-#include <curl/curl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <uuid/uuid.h>
+#include "core/utils/base64.h"
+#include "core/utils/utils.h"
 
 #ifdef TEST_MODE
 #include "testing/testing.h"
@@ -42,9 +39,7 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
   clock_t start_setup_keys = clock();
 #endif
-  // test_connection();
-  printf("Connecting to server...\n");
-  int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
+  int sockfd = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT);
   if (sockfd < 0)
   {
     printf("Failed to connect to server\n");
@@ -69,7 +64,7 @@ int main(int argc, char *argv[])
   /* Format and encode the public key */
   int pk_len = g2_size_bin(pk, 1);
   char pk_buffer[pk_len];
-  g2_write_bin(pk_buffer, pk_len, pk, 1);
+  g2_write_bin((uint8_t *)pk_buffer, pk_len, pk, 1);
   size_t encoded_len;
   char *pk_b64_custom = base64_enc(pk_buffer, pk_len, &encoded_len);
 
@@ -88,7 +83,6 @@ int main(int argc, char *argv[])
     start_ete = clock();
 #endif
     uint64_t scale = 1;
-
     /* Allocate the data points */
     dig_t *data_points = (dig_t *)malloc(sizeof(dig_t) * NUM_DATA_POINTS);
     if (data_points == NULL)
@@ -105,30 +99,29 @@ int main(int argc, char *argv[])
     }
 
     /* Create JSON object for the request */
-    cJSON *json_obj = cJSON_CreateObject();
-    if (json_obj == NULL)
-    {
-      fprintf(stderr, "Failed to create JSON object\n");
-      free(data_points);
-      return -1;
-    }
+    // cJSON *json_obj = cJSON_CreateObject();
+    // if (json_obj == NULL)
+    // {
+    //   fprintf(stderr, "Failed to create JSON object\n");
+    //   free(data_points);
+    //   return -1;
+    // }
     /* Signature mode - create and sign message */
     message_t *message = (message_t *)malloc(sizeof(message_t));
     if (message == NULL)
     {
       fprintf(stderr, "Could not allocate message\n");
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
-
     /* Initialize the message */
     int init_res = init_message(message, data_points, NUM_DATA_POINTS);
     if (init_res != 0)
     {
       fprintf(stderr, "Failed to initialize message\n");
       free(message);
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -149,7 +142,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to sign data points\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -175,7 +168,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to encode signatures\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -221,7 +214,6 @@ int main(int argc, char *argv[])
     char json_buffer[JSON_BUFFER_SIZE]; // Adjust size based on expected data volume
     json_t json;
     json_init(&json, json_buffer, sizeof(json_buffer));
-    printf("JSON buffer size: %zu\n", sizeof(json_buffer));
     int prepare_json = prepare_req_server(&json, message, master_decoded_sig_buf,
                                           data_points, NUM_DATA_POINTS, pk_b64_custom, sig_len,
                                           scale, FUNC, &love_data);
@@ -230,7 +222,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to prepare request\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -277,7 +269,7 @@ int main(int argc, char *argv[])
     if (setup_POST(request, sockfd, &req, json.buffer, "/new", SERVER_IP) != 0)
     {
       fprintf(stderr, "Failed to setup POST request\n");
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -286,12 +278,12 @@ int main(int argc, char *argv[])
     if (res < 0)
     {
       fprintf(stderr, "Failed to send POST request\n");
-      cJSON_Delete(json_obj);
+      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
-    // Print the response
-    printf("Response: %s\n", response);
+    printf("ok\n");	
+    
 #ifdef TEST_MODE
     clock_t end_req = clock();
     end_ete = clock();
@@ -303,7 +295,7 @@ int main(int argc, char *argv[])
 #endif
 
     /* Cleanup for this iteration */
-    cJSON_Delete(json_obj);
+    // cJSON_Delete(json_obj);
     free(data_points);
 
     iterations++;

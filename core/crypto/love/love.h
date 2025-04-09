@@ -32,6 +32,36 @@ typedef struct love_data
     char *e_encoded;  // Base64 encoded e
 } love_data_t;
 
+
+/**
+ * @brief Data structure for request data for love pairing
+ *
+ *
+ * @param r1 First challenge value
+ * @param r2 Second challenge value
+ * @param v1 First group element
+ * @param g Group element from verifier
+ * @param g2 Second group element from verifier
+ * @param w2 Third group element
+ * @param c Array of pairing results from first challenge
+ * @param e Array of pairing results from second challenge
+ */
+
+ typedef struct pairing_data
+ {
+     /* For request */
+     bn_t r1; // first challenge
+     bn_t r2; // second challenge
+     g1_t v1;
+     g1_t g;
+     g2_t g2;
+     g2_t w2;
+     /* Results of the pairings */
+     gt_t c[2];
+     gt_t e[2];
+ 
+ } pairing_data_t;
+
 /**
  * @brief Initializes a love_data structure with RELIC elements and encoded fields
  *
