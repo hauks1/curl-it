@@ -80,30 +80,60 @@ int generate_love_precomputation(love_data_t *love_data)
     }
 
     // Encode the parameters for transmission
+    size_t r_out_len;
     int r_len = bn_size_bin(love_data->r);
     unsigned char r_buf[r_len];
     bn_write_bin(r_buf, r_len, love_data->r);
-    love_data->r_encoded = base64_encode((char *)r_buf, r_len);
-
+    love_data->r_encoded = base64_enc((char *)r_buf, r_len, &r_out_len);
+    if (love_data->r_encoded == NULL)
+    {
+        fprintf(stderr, "Failed to encode r\n");
+        return -1;
+    }
+    printf("Encoded r: %s\n", love_data->r_encoded);
+    size_t u1_out_len;
     int u1_len = g1_size_bin(love_data->u1, 1);
     unsigned char u1_buf[u1_len];
     g1_write_bin(u1_buf, u1_len, love_data->u1, 1);
-    love_data->u1_encoded = base64_encode((char *)u1_buf, u1_len);
-
+    love_data->u1_encoded = base64_enc((char *)u1_buf, u1_len, &u1_out_len);
+    if (love_data->u1_encoded == NULL)
+    {
+        fprintf(stderr, "Failed to encode u1\n");
+        return -1;
+    }
+    printf("Encoded u1: %s\n", love_data->u1_encoded);
+    size_t u2_out_len;
     int u2_len = g2_size_bin(love_data->u2, 1);
     unsigned char u2_buf[u2_len];
     g2_write_bin(u2_buf, u2_len, love_data->u2, 1);
-    love_data->u2_encoded = base64_encode((char *)u2_buf, u2_len);
-
+    love_data->u2_encoded = base64_enc((char *)u2_buf, u2_len, &u2_out_len);
+    if (love_data->u2_encoded == NULL)
+    {
+        fprintf(stderr, "Failed to encode u2\n");
+        return -1;
+    }
+    printf("Encoded u2: %s\n", love_data->u2_encoded);
+    size_t v2_out_len;
     int v2_len = g2_size_bin(love_data->v2, 1);
     unsigned char v2_buf[v2_len];
     g2_write_bin(v2_buf, v2_len, love_data->v2, 1);
-    love_data->v2_encoded = base64_encode((char *)v2_buf, v2_len);
-
+    love_data->v2_encoded = base64_enc((char *)v2_buf, v2_len, &v2_out_len);
+    if (love_data->v2_encoded == NULL)
+    {
+        fprintf(stderr, "Failed to encode v2\n");
+        return -1;
+    }
+    printf("Encoded v2: %s\n", love_data->v2_encoded);
+    size_t e_out_len;
     int e_len = gt_size_bin(love_data->e, 1);
     unsigned char e_buf[e_len];
     gt_write_bin(e_buf, e_len, love_data->e, 1);
-    love_data->e_encoded = base64_encode((char *)e_buf, e_len);
-
+    love_data->e_encoded = base64_enc((char *)e_buf, e_len, &e_out_len);
+    if (love_data->e_encoded == NULL)
+    {
+        fprintf(stderr, "Failed to encode e\n");
+        return -1;
+    }
+    printf("Encoded e: %s\n", love_data->e_encoded);
     return 0;
 }

@@ -40,9 +40,18 @@ int convert_to_g1(g1_t new_sig, char *decoded_sig, dig_t len)
     }
     return RLC_OK;
 }
-size_t *base64_out_len(size_t in_len) { return 4 * ((in_len + 2) / 3); }
+char base64_enctable[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                          'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+                          'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                          'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+                          'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+                          'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+                          'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                          '4', '5', '6', '7', '8', '9', '+', '/'};
+char base64_dectable[256];
+size_t base64_out_len(size_t in_len) { return 4 * ((in_len + 2) / 3); }
 
-void build_decoding_table()
+void base64_build_dectable()
 {
     // Initialize the decoding table
     for (int i = 0; i < 256; i++)
@@ -55,7 +64,7 @@ void build_decoding_table()
     }
 }
 
-char *base64_enc(const unsigned char *data, size_t input_length, size_t *output_length)
+char *base64_enc(char *data, size_t input_length, size_t *output_length)
 {
     *output_length = base64_out_len(input_length);
     char *encoded = malloc(*output_length + 1);
@@ -64,6 +73,7 @@ char *base64_enc(const unsigned char *data, size_t input_length, size_t *output_
         fprintf(stderr, "Memory allocation failed for base64 encoding\n");
         return NULL;
     }
+
     // Divide the input into 3 byte blocks
 
     for (int i = 0; i < input_length; i += 3)
@@ -87,10 +97,10 @@ char *base64_enc(const unsigned char *data, size_t input_length, size_t *output_
     return encoded;
 }
 
-char *base64_dec(const unsigned char *data, size_t input_length, size_t *output_length)
+char *base64_dec(char *data, size_t input_length, size_t *output_length)
 {
     if (base64_dectable[0] == -1)
-        build_decoding_table();
+        base64_build_dectable();
 
     if (input_length % 4 != 0)
         return NULL;
@@ -131,35 +141,31 @@ char *base64_dec(const unsigned char *data, size_t input_length, size_t *output_
     return decoded;
 }
 
-char *base64_decode(const char *input, int length, int *decoded_length)
-{
-    base64_decodestate state;
-    base64_init_decodestate(&state);
+// char *base64_decode(const char *input, int length, int *decoded_length)
+// {
+//     base64_decodestate state;
+//     base64_init_decodestate(&state);
 
-    char *decoded = (char *)malloc(length * 3 / 4 + 1); // Allocate enough space for decoded data
-    *decoded_length = base64_decode_block(input, length, decoded, &state);
-    decoded[*decoded_length] = '\0'; // Null-terminate the decoded string
+//     char *decoded = (char *)malloc(length * 3 / 4 + 1); // Allocate enough space for decoded data
+//     *decoded_length = base64_decode_block(input, length, decoded, &state);
+//     decoded[*decoded_length] = '\0'; // Null-terminate the decoded string
 
-    return decoded;
-}
+//     return decoded;
+// }
 
-char *base64_encode(const char *input, int length)
-{
-    base64_encodestate state;
-    base64_init_encodestate(&state);
+// char *base64_encode(const char *input, int length)
+// {
+//     base64_encodestate state;
+//     base64_init_encodestate(&state);
 
-    int encoded_length = 4 * ((length + 2) / 3);        // Base64 encoded length
-    char *encoded = (char *)malloc(encoded_length + 1); // +1 for null terminator
-    int len = base64_encode_block(input, length, encoded, &state);
-    len += base64_encode_blockend(encoded + len, &state);
-    encoded[len] = '\0'; // Null-terminate the encoded string
+//     int encoded_length = 4 * ((length + 2) / 3);        // Base64 encoded length
+//     char *encoded = (char *)malloc(encoded_length + 1); // +1 for null terminator
+//     int len = base64_encode_block(input, length, encoded, &state);
+//     len += base64_encode_blockend(encoded + len, &state);
+//     encoded[len] = '\0'; // Null-terminate the encoded string
 
-    return encoded;
-}
-
-unsigned char *base64_enc(const unsigned char *data, size_t input_length, size_t *output_length)
-{
-}
+//     return encoded;
+// }
 
 int encode_signatures(message_t *msg, unsigned char *master[], char *master_decoded[], int num_data_points)
 {
@@ -178,7 +184,9 @@ int encode_signatures(message_t *msg, unsigned char *master[], char *master_deco
 
         g1_write_bin(master[i], sig_len, msg->sigs[i], 1); // Write the signature to the byte array
         // Encode the signature
-        master_decoded[i] = base64_encode((char *)master[i], sig_len);
+        size_t sig_len_encoded;
+        master_decoded[i] = base64_enc((char *)master[i], sig_len, &sig_len_encoded);
+        printf("Encoded signature %zu: %s\n", i, master_decoded[i]);
         if (master_decoded[i] == NULL)
         {
             fprintf(stderr, "Failed to encode signature %zu\n", i);

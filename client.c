@@ -42,16 +42,17 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
   clock_t start_setup_keys = clock();
 #endif
-// test_connection();
-printf("Connecting to server...\n");
-int sockfd = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT);
-if(sockfd < 0)
-{
-  printf("Failed to connect to server\n");
-  return -1;
-}
-printf("Connected to server\n");
+  // test_connection();
+  printf("Connecting to server...\n");
+  int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
+  if (sockfd < 0)
+  {
+    printf("Failed to connect to server\n");
+    return -1;
+  }
+  printf("Connected to server\n");
   relic_init();
+  base64_build_dectable();
   /* Generate the secret and public key */
   g2_null(pk);
   bn_null(sk);
@@ -67,14 +68,10 @@ printf("Connected to server\n");
   }
   /* Format and encode the public key */
   int pk_len = g2_size_bin(pk, 1);
-  unsigned char pk_buf[pk_len];
-  g2_write_bin(pk_buf, pk_len, pk, 1);
-  pk_b64 = base64_encode((char *)pk_buf, pk_len);
-  if (pk_b64 == NULL)
-  {
-    fprintf(stderr, "Failed to encode public key\n");
-    return -1;
-  }
+  char pk_buffer[pk_len];
+  g2_write_bin(pk_buffer, pk_len, pk, 1);
+  size_t encoded_len;
+  char *pk_b64_custom = base64_enc(pk_buffer, pk_len, &encoded_len);
 
 #ifdef TEST_MODE
   clock_t end_setup_keys = clock();
@@ -182,6 +179,7 @@ printf("Connected to server\n");
       free(data_points);
       return -1;
     }
+
 #ifdef TEST_MODE
     end_encode = clock();
     // metrics_t encode_metrics = get_metrics(start_encode, end_encode, sizeof(message_t), "encode", test_config);
@@ -223,9 +221,10 @@ printf("Connected to server\n");
     char json_buffer[JSON_BUFFER_SIZE]; // Adjust size based on expected data volume
     json_t json;
     json_init(&json, json_buffer, sizeof(json_buffer));
+    printf("JSON buffer size: %zu\n", sizeof(json_buffer));
     int prepare_json = prepare_req_server(&json, message, master_decoded_sig_buf,
-                                     data_points, NUM_DATA_POINTS, pk_b64, sig_len,
-                                     scale, FUNC,&love_data);
+                                          data_points, NUM_DATA_POINTS, pk_b64_custom, sig_len,
+                                          scale, FUNC, &love_data);
     if (prepare_json != 0)
     {
       fprintf(stderr, "Failed to prepare request\n");
@@ -235,31 +234,6 @@ printf("Connected to server\n");
       free(data_points);
       return -1;
     }
-    // Print the JSON object
-    printf("JSON Object: %s\n", json.buffer);
-    // check that the JSON object is valid using cJSON
-    cJSON *json_obj_check = cJSON_Parse(json.buffer);
-    if (json_obj_check == NULL)
-    {
-      fprintf(stderr, "Failed to parse JSON object\n");
-      cleanup_message(message, NUM_DATA_POINTS);
-      free(message);
-      cJSON_Delete(json_obj);
-      free(data_points);
-      return -1;
-    }
-    // print the JSON object
-    char *json_str = cJSON_Print(json_obj_check);
-    if (json_str == NULL)
-    {
-      fprintf(stderr, "Failed to print JSON object\n");
-      cleanup_message(message, NUM_DATA_POINTS);
-      free(message);
-      cJSON_Delete(json_obj);
-      free(data_points);
-      return -1;
-    }
-    printf("JSON Object: %s\n", json_str);
     // int prepare_love = add_love_data_json(json_obj, &love_data);
     // if (prepare_love != 0)
     // {
@@ -286,7 +260,7 @@ printf("Connected to server\n");
     }
 
     /* Send to server */
-    int curl_res;
+    // int curl_res;
 #ifdef TEST_MODE
     clock_t start_req = clock();
 #endif
