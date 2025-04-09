@@ -9,6 +9,18 @@
 #include <relic/relic.h>
 #include "../../message/message.h"
 
+const char base64_enctable[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                                '4', '5', '6', '7', '8', '9', '+', '/'};
+extern char base64_dectable[256];
+char *base64_enc(const unsigned char *data, size_t input_length, size_t *output_length);
+char *base64_dec(const unsigned char *data, size_t input_length, size_t *output_length);
+
 /**
  * @brief Initializes the RELIC library core and sets pairing parameters.
  *
