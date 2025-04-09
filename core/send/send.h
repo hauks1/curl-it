@@ -7,6 +7,7 @@
 #define MAX_STRDUP_SIZE 1024
 #define MAX_PATH_SIZE 8
 #define SERVER_IP "129.242.236.85"
+#define LOCAL_SERVER_IP "127.0.0.1"
 #define SERVER_PORT 12345
 
 /**

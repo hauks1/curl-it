@@ -9,6 +9,8 @@ SOURCES = client.c \
           core/crypto/mklhs/mklhs.c \
           core/crypto/love/love.c \
           core/request/request.c \
+          core/request/json.c \
+          core/utils/bad_string.c \
           core/send/send.c
 
 HEADERS = testing/testing.h \
@@ -17,6 +19,8 @@ HEADERS = testing/testing.h \
           core/crypto/mklhs/mklhs.h \
           core/crypto/love/love.h \
           core/request/request.h \
+          core/request/json.h \
+          core/utils/bad_string.h \
           core/send/send.h
 
 CLIENT = client

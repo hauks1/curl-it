@@ -5,6 +5,7 @@
 #include "core/crypto/love/love.h"
 #include "core/crypto/mklhs/mklhs.h"
 #include "core/crypto/utils/utils.h"
+#include "core/request/json.h"
 
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
@@ -17,19 +18,10 @@
 #include "testing/testing.h"
 #endif
 
-void print_usage(char *program_name)
-{
-  printf("Usage: %s [options]\n", program_name);
-  printf("Options:\n");
-  printf("  --float          Generate float data points\n");
-  printf("  --iterations N   Run N iterations (default: 1000)\n");
-  printf("  --verbose        Enable verbose output\n");
-  printf("  --help           Display this help message\n");
-}
-
 /* MAIN */
 int main(int argc, char *argv[])
 {
+  printf("Starting client...\n");
 #ifdef TEST_MODE
 #include "utils/testing.h"
   // Initialize test config
@@ -41,33 +33,7 @@ int main(int argc, char *argv[])
   printf("Running in TESTING MODE\n");
 #endif
   /* Parse command line arguments */
-  int use_float = 0;
-  int verbose = 0;
-  int iterations_count = 1000;
-
-  for (int i = 1; i < argc; i++)
-  {
-    if (strcmp(argv[i], "--float") == 0)
-    {
-      use_float = 1;
-    }
-    else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc)
-    {
-      iterations_count = atoi(argv[i + 1]);
-      i++; // Skip the next argument
-    }
-    else if (strcmp(argv[i], "--help") == 0)
-    {
-      print_usage(argv[0]);
-      return 0;
-    }
-    else
-    {
-      printf("Unknown option: %s\n", argv[i]);
-      print_usage(argv[0]);
-      return 1;
-    }
-  }
+  int iterations_count = 10;
 
   g2_t pk;
   bn_t sk;
@@ -76,8 +42,15 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
   clock_t start_setup_keys = clock();
 #endif
-  // test_connection();
-  int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
+// test_connection();
+printf("Connecting to server...\n");
+int sockfd = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT);
+if(sockfd < 0)
+{
+  printf("Failed to connect to server\n");
+  return -1;
+}
+printf("Connected to server\n");
   relic_init();
   /* Generate the secret and public key */
   g2_null(pk);
@@ -127,34 +100,11 @@ int main(int argc, char *argv[])
       return -1;
     }
     /* Generate data points based on arguments */
-    if (use_float)
+    int gen_res = gen_dig_data_points(data_points, NUM_DATA_POINTS);
+    if (gen_res != 0)
     {
-      scale = 1000000;
-      if (verbose)
-        printf("Generating float data points...\n");
-      double *float_data_points =
-          (double *)malloc(sizeof(double) * NUM_DATA_POINTS);
-      if (float_data_points == NULL)
-      {
-        fprintf(stderr, "Could not allocate float data points\n");
-        return -1;
-      }
-      int gen_float_res =
-          gen_float_data_points(float_data_points, NUM_DATA_POINTS);
-      if (gen_float_res != 0)
-      {
-        fprintf(stderr, "Failed to generate float data points\n");
-        return -1;
-      }
-    }
-    else
-    {
-      int gen_res = gen_dig_data_points(data_points, NUM_DATA_POINTS);
-      if (gen_res != 0)
-      {
-        fprintf(stderr, "Failed to generate data points\n");
-        return -1;
-      }
+      fprintf(stderr, "Failed to generate data points\n");
+      return -1;
     }
 
     /* Create JSON object for the request */
@@ -256,11 +206,27 @@ int main(int argc, char *argv[])
     clock_t start_prepare, end_prepare;
     start_prepare = clock();
 #endif
-    /* Prepare request */
-    int prepare = prepare_request_server(
-        json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
-        pk_b64, sig_len, scale, FUNC);
-    if (prepare != 0)
+    // /* Prepare request */
+    // int prepare = prepare_request_server(
+    //     json_obj, message, master_decoded_sig_buf, data_points, NUM_DATA_POINTS,
+    //     pk_b64, sig_len, scale, FUNC);
+    // if (prepare != 0)
+    // {
+    //   fprintf(stderr, "Failed to prepare request\n");
+    //   cleanup_message(message, NUM_DATA_POINTS);
+    //   free(message);
+    //   cJSON_Delete(json_obj);
+    //   free(data_points);
+    //   return -1;
+    // }
+    /* Print the JSON object */
+    char json_buffer[JSON_BUFFER_SIZE]; // Adjust size based on expected data volume
+    json_t json;
+    json_init(&json, json_buffer, sizeof(json_buffer));
+    int prepare_json = prepare_req_server(&json, message, master_decoded_sig_buf,
+                                     data_points, NUM_DATA_POINTS, pk_b64, sig_len,
+                                     scale, FUNC,&love_data);
+    if (prepare_json != 0)
     {
       fprintf(stderr, "Failed to prepare request\n");
       cleanup_message(message, NUM_DATA_POINTS);
@@ -269,12 +235,37 @@ int main(int argc, char *argv[])
       free(data_points);
       return -1;
     }
-    int prepare_love = add_love_data_json(json_obj, &love_data);
-    if (prepare_love != 0)
+    // Print the JSON object
+    printf("JSON Object: %s\n", json.buffer);
+    // check that the JSON object is valid using cJSON
+    cJSON *json_obj_check = cJSON_Parse(json.buffer);
+    if (json_obj_check == NULL)
     {
-      fprintf(stderr, "Failed to add love data to the json object\n");
+      fprintf(stderr, "Failed to parse JSON object\n");
+      cleanup_message(message, NUM_DATA_POINTS);
+      free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
       return -1;
     }
+    // print the JSON object
+    char *json_str = cJSON_Print(json_obj_check);
+    if (json_str == NULL)
+    {
+      fprintf(stderr, "Failed to print JSON object\n");
+      cleanup_message(message, NUM_DATA_POINTS);
+      free(message);
+      cJSON_Delete(json_obj);
+      free(data_points);
+      return -1;
+    }
+    printf("JSON Object: %s\n", json_str);
+    // int prepare_love = add_love_data_json(json_obj, &love_data);
+    // if (prepare_love != 0)
+    // {
+    //   fprintf(stderr, "Failed to add love data to the json object\n");
+    //   return -1;
+    // }
 
 #ifdef TEST_MODE
     end_prepare = clock();
@@ -309,7 +300,7 @@ int main(int argc, char *argv[])
     // }
     char request[BUFFER_SIZE];
     request_t req;
-    if (setup_POST(request, sockfd, &req, cJSON_Print(json_obj), "/new", SERVER_IP) != 0)
+    if (setup_POST(request, sockfd, &req, json.buffer, "/new", SERVER_IP) != 0)
     {
       fprintf(stderr, "Failed to setup POST request\n");
       cJSON_Delete(json_obj);
