@@ -79,6 +79,7 @@ int generate_love_precomputation(love_data_t *love_data)
     }
 
     // Encode the parameters for transmission
+    // r
     size_t r_out_len;
     int r_len = bn_size_bin(love_data->r);
     unsigned char r_buf[r_len];
@@ -89,6 +90,7 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode r\n");
         return -1;
     }
+    // u1
     size_t u1_out_len;
     int u1_len = g1_size_bin(love_data->u1, 1);
     unsigned char u1_buf[u1_len];
@@ -99,6 +101,7 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode u1\n");
         return -1;
     }
+    // u2
     size_t u2_out_len;
     int u2_len = g2_size_bin(love_data->u2, 1);
     unsigned char u2_buf[u2_len];
@@ -109,6 +112,7 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode u2\n");
         return -1;
     }
+    // v2
     size_t v2_out_len;
     int v2_len = g2_size_bin(love_data->v2, 1);
     unsigned char v2_buf[v2_len];
@@ -119,6 +123,7 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode v2\n");
         return -1;
     }
+    // e
     size_t e_out_len;
     int e_len = gt_size_bin(love_data->e, 1);
     unsigned char e_buf[e_len];

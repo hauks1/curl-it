@@ -5,22 +5,24 @@ LIBS = -lrelic -lcurl -lcjson -l:libb64.a -luuid -pthread
 SOURCES = client.c \
           testing/testing.c \
           core/message/message.c \
-          core/crypto/utils/utils.c \
+          core/utils/utils.c \
           core/crypto/mklhs/mklhs.c \
-          core/crypto/love/love.c \
           core/request/request.c \
           core/request/json.c \
           core/utils/bad_string.c \
+          core/utils/base64.c \
+          core/crypto/love/love.c \
           core/send/send.c
 
 HEADERS = testing/testing.h \
           core/message/message.h \
-          core/crypto/utils/utils.h \
+          core/utils/utils.h \
           core/crypto/mklhs/mklhs.h \
-          core/crypto/love/love.h \
           core/request/request.h \
           core/request/json.h \
           core/utils/bad_string.h \
+          core/utils/base64.h \
+          core/crypto/love/love.h \
           core/send/send.h
 
 CLIENT = client

@@ -55,7 +55,6 @@ int connect_to_server(char *server_ip, int server_port)
         perror("Connection failed");
         return -1;
     }
-    printf("sock: %d\n", sock);
     return sock;
 }
 
@@ -353,8 +352,7 @@ int http_POST(char *response, request_t *req, size_t response_size)
     const char *cl_header = strstr(response, "content-length:");
     if (!cl_header)
     {
-        printf("No Content-Length header found\n");
-        return bytes_received; // No Content-Length header, return what we have
+        return bytes_received;
     }
 
     // Parse content length

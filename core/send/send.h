@@ -1,4 +1,13 @@
-/** @brief   */
+/**
+ * @file send.h
+ * @brief Header file for sending requests to a server
+ *
+ * This header file contains function declarations and type definitions
+ * for sending requests to a server using sockets and libcurl.
+ *
+ * @note This file is part of the client core module.
+ *
+ */
 #ifndef SEND_H
 #define SEND_H
 
@@ -13,11 +22,9 @@
 #include "../utils/bad_string.h"
 
 #define BUFFER_SIZE 4096 * 2
-#define MAX_STRDUP_SIZE 1024
-#define MAX_PATH_SIZE 8
+#define SERVER_PORT 12345
 #define SERVER_IP "129.242.236.85"
 #define LOCAL_SERVER_IP "127.0.0.1"
-#define SERVER_PORT 12345
 
 /**
  * @brief Struct to hold request information
