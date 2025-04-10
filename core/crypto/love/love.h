@@ -2,7 +2,7 @@
 #define LOVE_H
 
 #include <relic/relic.h>
-#include "../utils/utils.h"
+#include "../../utils/base64.h"
 
 /**
  * @brief Data structure for LOVE scheme
@@ -33,7 +33,6 @@ typedef struct love_data
     char *e_encoded;  // Base64 encoded e
 } love_data_t;
 
-
 /**
  * @brief Data structure for request data for love pairing
  *
@@ -48,20 +47,20 @@ typedef struct love_data
  * @param e Array of pairing results from second challenge
  */
 
- typedef struct pairing_data
- {
-     /* For request */
-     bn_t r1; // first challenge
-     bn_t r2; // second challenge
-     g1_t v1;
-     g1_t g;
-     g2_t g2;
-     g2_t w2;
-     /* Results of the pairings */
-     gt_t c[2];
-     gt_t e[2];
- 
- } pairing_data_t;
+typedef struct pairing_data
+{
+    /* For request */
+    bn_t r1; // first challenge
+    bn_t r2; // second challenge
+    g1_t v1;
+    g1_t g;
+    g2_t g2;
+    g2_t w2;
+    /* Results of the pairings */
+    gt_t c[2];
+    gt_t e[2];
+
+} pairing_data_t;
 
 /**
  * @brief Initializes a love_data structure with RELIC elements and encoded fields

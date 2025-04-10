@@ -1,5 +1,4 @@
 #include "utils.h"
-#include "base64.h"
 
 int relic_init()
 {

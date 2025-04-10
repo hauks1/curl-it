@@ -7,15 +7,9 @@
 #define CRYPTO_UTILS_H
 
 #include <relic/relic.h>
-#include "../../message/message.h"
 
-extern char base64_enctable[];
-// extern char base64_dectable[256];
-void base64_build_dectable();
-size_t base64_out_len(size_t in_len);
-char *base64_enc(char *data, size_t input_length, size_t *output_length);
-// char *base64_dec(char *data, size_t input_length, size_t *output_length);
-
+#include "../message/message.h"
+#include "base64.h"
 /**
  * @brief Initializes the RELIC library core and sets pairing parameters.
  *

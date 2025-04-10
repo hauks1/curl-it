@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
   clock_t start_setup_keys = clock();
 #endif
-  int sockfd = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT);
+  int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
   if (sockfd < 0)
   {
     printf("Failed to connect to server\n");
