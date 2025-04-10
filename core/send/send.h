@@ -1,7 +1,16 @@
 /** @brief   */
 #ifndef SEND_H
 #define SEND_H
-#include <cjson/cJSON.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#include "../utils/bad_string.h"
 
 #define BUFFER_SIZE 4096 * 2
 #define MAX_STRDUP_SIZE 1024
@@ -36,24 +45,24 @@ typedef enum
     REQUEST_FAILURE = -1,
 } request_error_t;
 
-// // request buffer
-// static char request_buffer[BUFFER_SIZE];
-/**
- * @brief Sends JSON data to a specified server URL using libcurl
- *
- * This function initializes a curl session and sends a POST request with JSON data
- * to the specified URL. It handles the HTTP headers, data serialization, and cleanup.
- *
- * @param url The destination URL where the JSON data will be sent
- * @param json A pointer to a cJSON object containing the data to be sent
- *
- * @return Returns 0 on successful transmission, -1 on failure
- *         (e.g., curl initialization failure or transmission error)
- *
- * @note The function automatically handles memory management for curl resources
- *       and JSON string conversion
- */
-int curl_to_server(const char *url, cJSON *json);
+// // // request buffer
+// // static char request_buffer[BUFFER_SIZE];
+// /**
+//  * @brief Sends JSON data to a specified server URL using libcurl
+//  *
+//  * This function initializes a curl session and sends a POST request with JSON data
+//  * to the specified URL. It handles the HTTP headers, data serialization, and cleanup.
+//  *
+//  * @param url The destination URL where the JSON data will be sent
+//  * @param json A pointer to a cJSON object containing the data to be sent
+//  *
+//  * @return Returns 0 on successful transmission, -1 on failure
+//  *         (e.g., curl initialization failure or transmission error)
+//  *
+//  * @note The function automatically handles memory management for curl resources
+//  *       and JSON string conversion
+//  */
+// int curl_to_server(const char *url, cJSON *json);
 
 /**
  * @brief Finds the path in the URL
@@ -89,19 +98,19 @@ int parse_http_body(char *body, const char *response);
  */
 int format_http_request(char *request, request_t *req);
 
-/**
- * @brief Sends a request to the server using a socket
- *
- * This function sends a request to the server using a socket connection.
- *
- * @param response A pointer to a buffer where the response will be stored
- * @param obj A pointer to a cJSON object containing the data to be sent
- * @param url The URL to send the request to
- * @param method The HTTP method (e.g., GET, POST)
- *
- * @return Returns 0 on success, -1 on failure
- */
-int socket_to_server(char *response, cJSON *obj, const char *url, char *method);
+// /**
+//  * @brief Sends a request to the server using a socket
+//  *
+//  * This function sends a request to the server using a socket connection.
+//  *
+//  * @param response A pointer to a buffer where the response will be stored
+//  * @param obj A pointer to a cJSON object containing the data to be sent
+//  * @param url The URL to send the request to
+//  * @param method The HTTP method (e.g., GET, POST)
+//  *
+//  * @return Returns 0 on success, -1 on failure
+//  */
+// int socket_to_server(char *response, cJSON *obj, const char *url, char *method);
 
 /**
  * @brief Connects to the server using TCP/IP

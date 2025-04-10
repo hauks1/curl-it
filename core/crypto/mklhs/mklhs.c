@@ -1,5 +1,4 @@
 #include "mklhs.h"
-#include <relic/relic.h>
 
 int gen_keys(bn_t sk, g2_t pk)
 {

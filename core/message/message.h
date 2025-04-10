@@ -9,6 +9,7 @@
 #define MESSAGE_H
 
 #include <relic/relic.h>
+#include "../utils/bad_string.h"
 
 #define FUNC "doubling"
 #define DEVICE_ID "12345"

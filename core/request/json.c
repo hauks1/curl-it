@@ -1,8 +1,4 @@
 #include "json.h"
-#include "../utils/bad_string.h"
-#include "../utils/base64.h"
-#include <cjson/cJSON.h>
-#include "relic/relic.h"
 
 void json_init(json_t *json, char *buffer, size_t capacity)
 {

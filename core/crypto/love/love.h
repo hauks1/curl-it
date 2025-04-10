@@ -2,6 +2,7 @@
 #define LOVE_H
 
 #include <relic/relic.h>
+#include "../utils/utils.h"
 
 /**
  * @brief Data structure for LOVE scheme

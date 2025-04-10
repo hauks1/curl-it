@@ -1,7 +1,6 @@
 #include <relic/relic.h>
 
 #include "love.h"
-#include "../utils/utils.h"
 
 int init_love_data(love_data_t *love_data)
 {
@@ -90,7 +89,6 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode r\n");
         return -1;
     }
-    printf("Encoded r: %s\n", love_data->r_encoded);
     size_t u1_out_len;
     int u1_len = g1_size_bin(love_data->u1, 1);
     unsigned char u1_buf[u1_len];
@@ -101,7 +99,6 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode u1\n");
         return -1;
     }
-    printf("Encoded u1: %s\n", love_data->u1_encoded);
     size_t u2_out_len;
     int u2_len = g2_size_bin(love_data->u2, 1);
     unsigned char u2_buf[u2_len];
@@ -112,7 +109,6 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode u2\n");
         return -1;
     }
-    printf("Encoded u2: %s\n", love_data->u2_encoded);
     size_t v2_out_len;
     int v2_len = g2_size_bin(love_data->v2, 1);
     unsigned char v2_buf[v2_len];
@@ -123,7 +119,6 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode v2\n");
         return -1;
     }
-    printf("Encoded v2: %s\n", love_data->v2_encoded);
     size_t e_out_len;
     int e_len = gt_size_bin(love_data->e, 1);
     unsigned char e_buf[e_len];
@@ -134,6 +129,5 @@ int generate_love_precomputation(love_data_t *love_data)
         fprintf(stderr, "Failed to encode e\n");
         return -1;
     }
-    printf("Encoded e: %s\n", love_data->e_encoded);
     return 0;
 }

@@ -52,7 +52,6 @@ int main(int argc, char *argv[])
   }
   printf("Connected to server\n");
   relic_init();
-  base64_build_dectable();
   /* Generate the secret and public key */
   g2_null(pk);
   bn_null(sk);
@@ -69,7 +68,7 @@ int main(int argc, char *argv[])
   /* Format and encode the public key */
   int pk_len = g2_size_bin(pk, 1);
   char pk_buffer[pk_len];
-  g2_write_bin(pk_buffer, pk_len, pk, 1);
+  g2_write_bin((unsigned char *)pk_buffer, pk_len, pk, 1);
   size_t encoded_len;
   char *pk_b64_custom = base64_enc(pk_buffer, pk_len, &encoded_len);
 
@@ -221,7 +220,6 @@ int main(int argc, char *argv[])
     char json_buffer[JSON_BUFFER_SIZE]; // Adjust size based on expected data volume
     json_t json;
     json_init(&json, json_buffer, sizeof(json_buffer));
-    printf("JSON buffer size: %zu\n", sizeof(json_buffer));
     int prepare_json = prepare_req_server(&json, message, master_decoded_sig_buf,
                                           data_points, NUM_DATA_POINTS, pk_b64_custom, sig_len,
                                           scale, FUNC, &love_data);
@@ -291,7 +289,7 @@ int main(int argc, char *argv[])
       return -1;
     }
     // Print the response
-    printf("Response: %s\n", response);
+    printf("ok\n");
 #ifdef TEST_MODE
     clock_t end_req = clock();
     end_ete = clock();

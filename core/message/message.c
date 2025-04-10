@@ -1,5 +1,19 @@
 #include "message.h"
-#include <uuid/uuid.h>
+
+// Random string
+void rand_str(char *dest, size_t length)
+{
+    char charset[] = "0123456789"
+                     "abcdefghijklmnopqrstuvwxyz"
+                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ./,-)(@~+*";
+
+    while (length-- > 0)
+    {
+        size_t index = (double)rand() / RAND_MAX * (sizeof charset - 1);
+        *dest++ = charset[index];
+    }
+    *dest = '\0';
+}
 
 int init_message(message_t *message, dig_t data_points[],
                  size_t num_data_points)
@@ -19,21 +33,15 @@ int init_message(message_t *message, dig_t data_points[],
         g1_null(message->sigs[i]);
         g1_new(message->sigs[i]);
 
-        // Create random tag's
-        uuid_t date;
-        uuid_generate_time(date);
-        char date_str[37];
-        uuid_unparse(date, date_str);
-
-        strncpy(message->tags[i], date_str, sizeof(message->tags[i]));
+        // Geneterate random strings not using UUID
+        char tag_str[MAX_ID_LENGTH];
+        rand_str(tag_str, MAX_ID_LENGTH - 1);
+        bad_strncpy(message->tags[i], tag_str, sizeof(message->tags[i]));
     }
-    uuid_t uuid;
-    uuid_generate(uuid);
-    char uuid_str[37];
-    uuid_unparse(uuid, uuid_str);
-    strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
+    // Device id
+    bad_strncpy(message->ids[0], DEVICE_ID, sizeof(DEVICE_ID));
     // Set data_set_id
-    strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
+    bad_strncpy(message->data_set_id, TEST_DATABASE, sizeof(message->data_set_id));
 
     return 0;
 }

@@ -11,6 +11,8 @@
 
 #define JSON_BUFFER_SIZE 4096
 #include <stddef.h>
+#include "relic/relic.h"
+#include "../utils/bad_string.h"
 
 /**
  * @struct json_t

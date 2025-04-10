@@ -1,49 +1,37 @@
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <curl/curl.h>
-#include <cjson/cJSON.h>
-#include <errno.h>
 
 #include "send.h"
-#include "../utils/bad_string.h"
-#include "../utils/base64.h"
-#include <stdio.h>
 
-int curl_to_server(const char *url, cJSON *json)
-{
-    CURL *curl_server;
-    CURLcode res_server;
+// int curl_to_server(const char *url, cJSON *json)
+// {
+//     CURL *curl_server;
+//     CURLcode res_server;
 
-    curl_server = curl_easy_init();
-    if (curl_server)
-    {
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
+//     curl_server = curl_easy_init();
+//     if (curl_server)
+//     {
+//         struct curl_slist *headers = NULL;
+//         headers = curl_slist_append(headers, "Content-Type: application/json");
 
-        char *json_str = cJSON_Print(json);
-        // Specify the URL
-        curl_easy_setopt(curl_server, CURLOPT_URL, url);
-        // Specify the data to be sent
-        curl_easy_setopt(curl_server, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl_server, CURLOPT_POSTFIELDS, json_str);
-        // Perform the request
-        res_server = curl_easy_perform(curl_server);
-        if (res_server != CURLE_OK)
-        {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
-            return -1;
-        }
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl_server);
-        cJSON_free(json_str);
-        return 0;
-    }
-    return -1;
-}
+//         char *json_str = cJSON_Print(json);
+//         // Specify the URL
+//         curl_easy_setopt(curl_server, CURLOPT_URL, url);
+//         // Specify the data to be sent
+//         curl_easy_setopt(curl_server, CURLOPT_HTTPHEADER, headers);
+//         curl_easy_setopt(curl_server, CURLOPT_POSTFIELDS, json_str);
+//         // Perform the request
+//         res_server = curl_easy_perform(curl_server);
+//         if (res_server != CURLE_OK)
+//         {
+//             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
+//             return -1;
+//         }
+//         curl_slist_free_all(headers);
+//         curl_easy_cleanup(curl_server);
+//         cJSON_free(json_str);
+//         return 0;
+//     }
+//     return -1;
+// }
 
 int connect_to_server(char *server_ip, int server_port)
 {
@@ -64,9 +52,7 @@ int connect_to_server(char *server_ip, int server_port)
     }
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-        printf("Connection error: %s\n", strerror(errno));
         perror("Connection failed");
-        printf("errno: %d\n", errno);
         return -1;
     }
     printf("sock: %d\n", sock);
@@ -156,12 +142,11 @@ int http_GET(char *response, request_t *req, size_t response_size)
     int req_len = format_GET_request(request, req);
     if (req_len < 0)
         return -1;
-    printf("Request: %s\n", request);
     // Send request in a single operation
-    if (send(req->socket, request, req_len, 0) < 0){
+    if (send(req->socket, request, req_len, 0) < 0)
+    {
         printf("Send failed\n");
         return -1;
-
     }
 
     // Receive response in a single read if possible
