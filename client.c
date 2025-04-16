@@ -183,9 +183,9 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t start_love = clock();
 #endif
-    love_data_t love_data;
-    init_love_data(&love_data);
-    generate_love_precomputation(&love_data);
+    // love_data_t love_data;
+    // // init_love_data(&love_data);
+    // // generate_love_precomputation(&love_data);
 
 #ifdef TEST_MODE
     clock_t end_love = clock();
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
     json_init(&json, json_buffer, sizeof(json_buffer));
     int prepare_json = prepare_req_server(&json, message, master_decoded_sig_buf,
                                           data_points, NUM_DATA_POINTS, pk_b64_custom, sig_len,
-                                          scale, FUNC, &love_data);
+                                          scale, FUNC);
     if (prepare_json != 0)
     {
       fprintf(stderr, "Failed to prepare request\n");

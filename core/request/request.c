@@ -94,8 +94,7 @@ int add_love_data_json_alt(json_t *json, love_data_t *data)
 
 int prepare_req_server(json_t *json, message_t *message, char *master_decoded_sig_buf[],
                        dig_t data_points[], size_t num_data_points,
-                       char *pk_b64, int sig_len, uint64_t scale, char *func,
-                       love_data_t *love_data)
+                       char *pk_b64, int sig_len, uint64_t scale, char *func)
 {
     // Start JSON object
     if (json_start_object(json) != 0)
@@ -321,14 +320,14 @@ int prepare_req_server(json_t *json, message_t *message, char *master_decoded_si
     }
 
     // Add LOVE data if provided
-    if (love_data != NULL)
-    {
-        if (add_love_data_json_alt(json, love_data) != 0)
-        {
-            fprintf(stderr, "Failed to add LOVE data to JSON\n");
-            return -1;
-        }
-    }
+    // if (love_data != NULL)
+    // {
+    //     if (add_love_data_json_alt(json, love_data) != 0)
+    //     {
+    //         fprintf(stderr, "Failed to add LOVE data to JSON\n");
+    //         return -1;
+    //     }
+    // }
 
     // Close the JSON object
     if (json_end_object(json) != 0)
