@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
   printf("Starting client...\n");
 #ifdef TEST_MODE
-#include "utils/testing.h"
+#include "testing/testing.h"
   // Initialize test config
   test_config_t test_config;
   test_config.num_data_points = NUM_DATA_POINTS;
@@ -28,26 +28,28 @@ int main(int argc, char *argv[])
   test_config.scale = 1;
   test_config.is_sig = 1;
   printf("Running in TESTING MODE\n");
+  clock_t start_connect = clock();
 #endif
   /* Parse command line arguments */
-  int iterations_count = 10;
+  int iterations_count = 10000;
 
-  g2_t pk;
-  bn_t sk;
-  char *pk_b64 = NULL;
-
-#ifdef TEST_MODE
-  clock_t start_setup_keys = clock();
-#endif
   int sockfd = connect_to_server(SERVER_IP, SERVER_PORT);
   if (sockfd < 0)
   {
     printf("Failed to connect to server\n");
     return -1;
   }
-  printf("Connected to server\n");
-  relic_init();
+#ifdef TEST_MODE
+  clock_t end_connect = clock();
+  metrics_t connect_metrics = get_latency_metrics(start_connect, end_connect, "connect");
+  log_latency_metrics_to_csv(&test_config, &connect_metrics);
+  clock_t start_setup_keys = clock();
+#endif
   /* Generate the secret and public key */
+  relic_init();
+  g2_t pk;
+  bn_t sk;
+  // char *pk_b64 = NULL;
   g2_null(pk);
   bn_null(sk);
   g2_new(pk);
@@ -180,18 +182,18 @@ int main(int argc, char *argv[])
     log_latency_metrics_to_csv(&test_config, &encode_metrics);
 #endif
 
-#ifdef TEST_MODE
-    clock_t start_love = clock();
-#endif
-    // love_data_t love_data;
-    // // init_love_data(&love_data);
-    // // generate_love_precomputation(&love_data);
+// #ifdef TEST_MODE
+//     clock_t start_love = clock();
+// #endif
+//     // love_data_t love_data;
+//     // // init_love_data(&love_data);
+//     // // generate_love_precomputation(&love_data);
 
-#ifdef TEST_MODE
-    clock_t end_love = clock();
-    metrics_t love_metrics = get_latency_metrics(start_love, end_love, "love");
-    log_latency_metrics_to_csv(&test_config, &love_metrics);
-#endif
+// #ifdef TEST_MODE
+//     clock_t end_love = clock();
+//     metrics_t love_metrics = get_latency_metrics(start_love, end_love, "love");
+//     log_latency_metrics_to_csv(&test_config, &love_metrics);
+// #endif
 #ifdef TEST_MODE
     clock_t start_prepare, end_prepare;
     start_prepare = clock();
@@ -286,8 +288,8 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     clock_t end_req = clock();
     end_ete = clock();
-    // metrics_t request_metrics = get_metrics(start_req, end_req, strlen(cJSON_Print(json_obj)), "request", test_config);
-    // log_metrics_to_csv(&test_config, &request_metrics);
+    metrics_t request_metrics = get_latency_metrics(start_req, end_req, "request");
+    log_latency_metrics_to_csv(&test_config, &request_metrics);
     // end-to-end metrics
     metrics_t ete_metrics = get_latency_metrics(start_ete, end_ete, "client-to-server");
     log_latency_metrics_to_csv(&test_config, &ete_metrics);
@@ -299,6 +301,6 @@ int main(int argc, char *argv[])
 
     iterations++;
   }
-  free(pk_b64);
+  free(pk_b64_custom);
   return 0;
 }

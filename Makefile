@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -g -I. 
-LIBS = -lrelic -lcurl -lcjson -l:libb64.a -luuid -pthread
+LIBS = -lrelic 
 
 SOURCES = client.c \
           testing/testing.c \
@@ -11,7 +11,6 @@ SOURCES = client.c \
           core/request/json.c \
           core/utils/bad_string.c \
           core/utils/base64.c \
-          core/crypto/love/love.c \
           core/send/send.c
 
 HEADERS = testing/testing.h \
@@ -22,7 +21,6 @@ HEADERS = testing/testing.h \
           core/request/json.h \
           core/utils/bad_string.h \
           core/utils/base64.h \
-          core/crypto/love/love.h \
           core/send/send.h
 
 CLIENT = client
