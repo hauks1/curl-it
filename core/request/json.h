@@ -1,6 +1,6 @@
 /**
  * @file json.h
- * @brief Lightweight JSON serialization library for memory-constrained environments.
+ * @brief Lightweight JSON serialization.
  *
  * This library provides a set of functions to create JSON objects and arrays
  * with minimal memory allocation, suitable for embedded systems and IoT devices.

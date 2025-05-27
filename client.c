@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "relic/relic.h"
+/* Internal includes */
 #include "core/send/send.h"
 #include "core/request/json.h"
 #include "core/message/message.h"
 #include "core/request/request.h"
-#include "core/crypto/love/love.h"
 #include "core/crypto/mklhs/mklhs.h"
 #include "core/utils/base64.h"
 #include "core/utils/utils.h"
@@ -16,7 +15,6 @@
 #endif
 
 /* MAIN */
-
 int main(int argc, char *argv[])
 {
   int iterations = 0;
@@ -40,8 +38,6 @@ int main(int argc, char *argv[])
 #ifdef TEST_MODE
     struct timeval start_setup_keys = timer_start();
 #endif
-    /* Generate the secret and public key */
-
     /* Generate key pair */
     int res = gen_keys(sk, pk);
     if (res != 0)
@@ -85,7 +81,6 @@ int main(int argc, char *argv[])
     if (message == NULL)
     {
       fprintf(stderr, "Could not allocate message\n");
-      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -95,7 +90,6 @@ int main(int argc, char *argv[])
     {
       fprintf(stderr, "Failed to initialize message\n");
       free(message);
-      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -110,7 +104,6 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to sign data points\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -131,7 +124,6 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to encode signatures\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
@@ -151,11 +143,9 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Failed to prepare request\n");
       cleanup_message(message, NUM_DATA_POINTS);
       free(message);
-      // cJSON_Delete(json_obj);
       free(data_points);
       return -1;
     }
-
 #ifdef TEST_MODE
     timer_end(start_prepare, "prepare");
     struct timeval start_req = timer_start();
@@ -170,6 +160,7 @@ int main(int argc, char *argv[])
       free(master_decoded_sig_buf[i]);
       free(master_sig_buf[i]);
     }
+    // Format and send POST
     char request[BUFFER_SIZE];
     request_t req;
     if (setup_POST(request, sockfd, &req, json.buffer, "/new", SERVER_IP) != 0)
@@ -186,12 +177,11 @@ int main(int argc, char *argv[])
       free(data_points);
       return -1;
     }
+    // ok
     printf("ok\n");
 #ifdef TEST_MODE
     timer_end(start_req, "request");
-
 #endif
-
     /* Cleanup for this iteration */
     free(data_points);
     iterations++;

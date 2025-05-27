@@ -1,38 +1,6 @@
 
 #include "send.h"
 
-// int curl_to_server(const char *url, cJSON *json)
-// {
-//     CURL *curl_server;
-//     CURLcode res_server;
-
-//     curl_server = curl_easy_init();
-//     if (curl_server)
-//     {
-//         struct curl_slist *headers = NULL;
-//         headers = curl_slist_append(headers, "Content-Type: application/json");
-
-//         char *json_str = cJSON_Print(json);
-//         // Specify the URL
-//         curl_easy_setopt(curl_server, CURLOPT_URL, url);
-//         // Specify the data to be sent
-//         curl_easy_setopt(curl_server, CURLOPT_HTTPHEADER, headers);
-//         curl_easy_setopt(curl_server, CURLOPT_POSTFIELDS, json_str);
-//         // Perform the request
-//         res_server = curl_easy_perform(curl_server);
-//         if (res_server != CURLE_OK)
-//         {
-//             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res_server));
-//             return -1;
-//         }
-//         curl_slist_free_all(headers);
-//         curl_easy_cleanup(curl_server);
-//         cJSON_free(json_str);
-//         return 0;
-//     }
-//     return -1;
-// }
-
 int connect_to_server(char *server_ip, int server_port)
 {
     struct sockaddr_in server_addr;
@@ -115,7 +83,6 @@ int create_GET_request(request_t *req, int sockfd, char *path, char *host)
     bad_strcpy(req->host, host);
     return 0;
 }
-
 int format_GET_request(char *formated_req, request_t *req)
 {
     if (req == NULL)
@@ -130,7 +97,6 @@ int format_GET_request(char *formated_req, request_t *req)
         return -1;
     return len;
 }
-
 int http_GET(char *response, request_t *req, size_t response_size)
 {
     if (req->socket < 0)
@@ -178,7 +144,7 @@ int http_GET(char *response, request_t *req, size_t response_size)
     if (body_received >= content_length)
         return bytes_received;
 
-    // We need to read more data - but only the exact amount needed
+    // We need to read more data
     size_t remaining = content_length - body_received;
     if (remaining > response_size - bytes_received - 1)
     {
@@ -189,7 +155,7 @@ int http_GET(char *response, request_t *req, size_t response_size)
     ssize_t additional = recv(req->socket,
                               response + bytes_received,
                               remaining,
-                              MSG_WAITALL); // Wait for all data
+                              MSG_WAITALL);
 
     if (additional > 0)
     {
@@ -205,11 +171,9 @@ int test_connection()
     int sock;
     if ((sock = connect_to_server(LOCAL_SERVER_IP, SERVER_PORT)) < 0)
     {
-        printf("HERE\n");
         printf("Failed to connect to server1\n");
         return -1;
     }
-    printf("Sock: %d\n", sock);
     // Create the request
     request_t req;
     if (create_GET_request(&req, sock, "/ping", LOCAL_SERVER_IP) != 0)
@@ -302,9 +266,8 @@ int format_POST_request(char *formated_req, request_t *req)
     if ((size_t)res >= BUFFER_SIZE)
         return -1;
 
-    return res; // Return the formatted length for more efficient send
+    return res;
 }
-
 int setup_POST(char *request, int sock, request_t *req, const char *data, char *path, char *host)
 {
     if (req == NULL)
@@ -321,7 +284,6 @@ int setup_POST(char *request, int sock, request_t *req, const char *data, char *
 
     return 0;
 }
-
 int http_POST(char *response, request_t *req, size_t response_size)
 {
     if (!req || req->socket < 0 || !response || response_size == 0)
